@@ -3,3 +3,4 @@ deps/
 native/exditorjs_native/target/
 native/exditorjs_native/docs/
 priv/
+*.dump
