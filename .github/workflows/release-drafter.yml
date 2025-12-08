@@ -53,7 +53,7 @@ jobs:
           prefix-key: v0-precomp
           shared-key: ${{ matrix.job.target }}-${{ matrix.nif }}
           workspaces: |
-            native/xler_native
+            native/exditorjs_native
 
       - name: Set Rust stack size
         shell: bash
@@ -64,12 +64,12 @@ jobs:
         id: build-crate
         uses: philss/rustler-precompiled-action@v1.1.4
         with:
-          project-name: xler_native
+          project-name: exditorjs_native
           project-version: ${{ env.PROJECT_VERSION }}
           target: ${{ matrix.job.target }}
           nif-version: ${{ matrix.nif }}
           use-cross: ${{ matrix.job.use-cross }}
-          project-dir: "native/xler_native"
+          project-dir: "native/exditorjs_native"
 
       # - name: Artifact attestation
       #   uses: actions/attest-build-provenance@v1
