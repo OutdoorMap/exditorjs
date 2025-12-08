@@ -54,18 +54,9 @@ impl MarkdownParser {
                 continue;
             }
 
-            // Check for lists
-            if line.trim_start().starts_with("- ") || line.trim_start().starts_with("* ") {
-                let (list_block, next_i) = self.parse_unordered_list(i);
-                blocks.push(list_block);
-                i = next_i;
-                continue;
-            }
-
-            if line.trim_start().chars().next().map_or(false, |c| c.is_numeric())
-                && line.contains(". ")
-            {
-                let (list_block, next_i) = self.parse_ordered_list(i);
+            // Check for lists (unordered, ordered, or checklist)
+            if self.is_list_start(line) {
+                let (list_block, next_i) = self.parse_list(i);
                 blocks.push(list_block);
                 i = next_i;
                 continue;
@@ -112,6 +103,194 @@ impl MarkdownParser {
         Ok(blocks)
     }
 
+    fn is_list_start(&self, line: &str) -> bool {
+        let trimmed = line.trim_start();
+        
+        // Unordered list: -, +, *
+        if trimmed.starts_with("- ") || trimmed.starts_with("+ ") || trimmed.starts_with("* ") {
+            return true;
+        }
+        
+        // Ordered list: 1. 2. etc
+        if let Some(dot_pos) = trimmed.find(". ") {
+            if trimmed[..dot_pos].chars().all(|c| c.is_numeric()) {
+                return true;
+            }
+        }
+        
+        // Checklist: - [ ] or - [x]
+        if trimmed.starts_with("- [") || trimmed.starts_with("+ [") || trimmed.starts_with("* [") {
+            return true;
+        }
+        
+        false
+    }
+
+    fn get_list_indent(&self, line: &str) -> usize {
+        line.len() - line.trim_start().len()
+    }
+
+    fn parse_list(&self, start: usize) -> (EditorJsBlock, usize) {
+        let first_line = &self.lines[start];
+        let trimmed = first_line.trim_start();
+        
+        let style = if self.is_checklist_item(trimmed) {
+            "checklist"
+        } else if self.is_ordered_list_item(trimmed) {
+            "ordered"
+        } else {
+            "unordered"
+        };
+
+        let (items, next_i) = self.parse_list_items(start, style);
+        
+        let data = if style == "ordered" {
+            ListData {
+                style: "ordered".to_string(),
+                items,
+                meta: Some(ListMeta {
+                    start: Some(1),
+                    counterType: None,
+                }),
+            }
+        } else {
+            ListData {
+                style: style.to_string(),
+                items,
+                meta: None,
+            }
+        };
+
+        (EditorJsBlock::List { data }, next_i)
+    }
+
+    fn is_checklist_item(&self, line: &str) -> bool {
+        let trimmed = line.trim_start();
+        trimmed.contains("- [") || trimmed.contains("+ [") || trimmed.contains("* [")
+    }
+
+    fn is_ordered_list_item(&self, line: &str) -> bool {
+        if let Some(dot_pos) = line.find(". ") {
+            line[..dot_pos].chars().all(|c| c.is_numeric())
+        } else {
+            false
+        }
+    }
+
+    fn parse_list_items(&self, start: usize, style: &str) -> (Vec<ListItem>, usize) {
+        let mut items = Vec::new();
+        let mut i = start;
+        let base_indent = self.get_list_indent(&self.lines[start]);
+
+        while i < self.lines.len() {
+            let line = &self.lines[i];
+            
+            if line.is_empty() {
+                i += 1;
+                continue;
+            }
+
+            let current_indent = self.get_list_indent(line);
+            let trimmed = line.trim_start();
+
+            // Check if this line is part of the current list
+            if !self.is_list_start(line) {
+                break;
+            }
+
+            // If indentation is less than base, we've finished this list
+            if current_indent < base_indent && !trimmed.is_empty() {
+                break;
+            }
+
+            // If same indent level as base
+            if current_indent == base_indent {
+                let (item, next_i) = self.parse_list_item(i, style);
+                items.push(item);
+                i = next_i;
+            } else if current_indent > base_indent {
+                // Nested item - add to last item
+                if let Some(last_item) = items.last_mut() {
+                    let (nested_items, next_i) = self.parse_list_items(i, style);
+                    last_item.items = nested_items;
+                    i = next_i;
+                } else {
+                    i += 1;
+                }
+            } else {
+                break;
+            }
+        }
+
+        (items, i)
+    }
+
+    fn parse_list_item(&self, index: usize, style: &str) -> (ListItem, usize) {
+        let line = &self.lines[index];
+        let trimmed = line.trim_start();
+
+        let (content, checked) = if style == "checklist" {
+            self.parse_checklist_item(trimmed)
+        } else if style == "ordered" {
+            (self.parse_ordered_list_item(trimmed), None)
+        } else {
+            (self.parse_unordered_list_item(trimmed), None)
+        };
+
+        let mut formatted_content = self.convert_inline_formatting(&content);
+        formatted_content = self.convert_markdown_links(&formatted_content);
+
+        let meta = if let Some(checked_val) = checked {
+            Some(ListItemMeta {
+                checked: Some(checked_val),
+            })
+        } else {
+            Some(ListItemMeta { checked: None })
+        };
+
+        (
+            ListItem {
+                content: formatted_content,
+                meta: meta.unwrap_or_default(),
+                items: Vec::new(),
+            },
+            index + 1,
+        )
+    }
+
+    fn parse_unordered_list_item(&self, line: &str) -> String {
+        if line.starts_with("- ") {
+            line[2..].trim().to_string()
+        } else if line.starts_with("+ ") {
+            line[2..].trim().to_string()
+        } else if line.starts_with("* ") {
+            line[2..].trim().to_string()
+        } else {
+            line.to_string()
+        }
+    }
+
+    fn parse_ordered_list_item(&self, line: &str) -> String {
+        if let Some(dot_pos) = line.find(". ") {
+            line[dot_pos + 2..].trim().to_string()
+        } else {
+            line.to_string()
+        }
+    }
+
+    fn parse_checklist_item(&self, line: &str) -> (String, Option<bool>) {
+        // Pattern: - [ ] text or - [x] text or - [X] text
+        let re = Regex::new(r"^[*+-]\s+\[([^\]]*)\]\s+(.*)$").unwrap();
+        if let Some(cap) = re.captures(line) {
+            let checkbox = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+            let content = cap.get(2).map(|m| m.as_str()).unwrap_or("").to_string();
+            let checked = checkbox.to_lowercase() == "x";
+            (content, Some(checked))
+        } else {
+            (line.to_string(), Some(false))
+        }
+    }
+
     fn parse_heading_level(&self, line: &str) -> Option<u8> {
         let trimmed = line.trim_start();
         for i in 1..=6 {
@@ -130,9 +309,7 @@ impl MarkdownParser {
             .trim()
             .to_string();
         
-        // Convert inline formatting
         text = self.convert_inline_formatting(&text);
-        // Convert markdown links to HTML links
         text = self.convert_markdown_links(&text);
         text
     }
@@ -142,13 +319,11 @@ impl MarkdownParser {
         let mut language = String::new();
         let mut i = start + 1;
 
-        // Get language if specified
         let first_line = &self.lines[start];
         if first_line.len() > 3 {
             language = first_line[3..].trim().to_string();
         }
 
-        // Collect code lines
         while i < self.lines.len() && !self.lines[i].trim().starts_with("```") {
             code_lines.push(self.lines[i].clone());
             i += 1;
@@ -168,72 +343,6 @@ impl MarkdownParser {
         (Some(block), if i < self.lines.len() { i + 1 } else { i })
     }
 
-    fn parse_unordered_list(&self, start: usize) -> (EditorJsBlock, usize) {
-        let mut items = Vec::new();
-        let mut i = start;
-
-        while i < self.lines.len() {
-            let line = &self.lines[i];
-            let trimmed = line.trim_start();
-
-            if !trimmed.starts_with("- ") && !trimmed.starts_with("* ") {
-                break;
-            }
-
-            let mut item = trimmed[2..].trim().to_string();
-            // Convert inline formatting
-            item = self.convert_inline_formatting(&item);
-            // Convert markdown links to HTML links
-            item = self.convert_markdown_links(&item);
-            items.push(item);
-            i += 1;
-        }
-
-        (
-            EditorJsBlock::List {
-                data: ListData {
-                    style: "unordered".to_string(),
-                    items,
-                },
-            },
-            i,
-        )
-    }
-
-    fn parse_ordered_list(&self, start: usize) -> (EditorJsBlock, usize) {
-        let mut items = Vec::new();
-        let mut i = start;
-
-        while i < self.lines.len() {
-            let line = &self.lines[i];
-            let trimmed = line.trim_start();
-
-            if let Some(dot_pos) = trimmed.find(". ") {
-                if trimmed[..dot_pos].chars().all(|c| c.is_numeric()) {
-                    let mut item = trimmed[dot_pos + 2..].trim().to_string();
-                    // Convert inline formatting
-                    item = self.convert_inline_formatting(&item);
-                    // Convert markdown links to HTML links
-                    item = self.convert_markdown_links(&item);
-                    items.push(item);
-                    i += 1;
-                    continue;
-                }
-            }
-            break;
-        }
-
-        (
-            EditorJsBlock::List {
-                data: ListData {
-                    style: "ordered".to_string(),
-                    items,
-                },
-            },
-            i,
-        )
-    }
-
     fn parse_blockquote(&self, start: usize) -> (EditorJsBlock, usize) {
         let mut lines = Vec::new();
         let mut i = start;
@@ -245,9 +354,7 @@ impl MarkdownParser {
         }
 
         let mut text = lines.join(" ");
-        // Convert inline formatting
         text = self.convert_inline_formatting(&text);
-        // Convert markdown links to HTML links
         text = self.convert_markdown_links(&text);
 
         (
@@ -263,14 +370,12 @@ impl MarkdownParser {
     }
 
     fn parse_image_markdown(&self, line: &str) -> Option<EditorJsBlock> {
-        // Pattern: ![alt text](url 'title') or ![alt text](url "title") or ![alt text](url)
         let re = Regex::new(r#"!\[([^\]]*)\]\(([^)\s]+)(?:\s+['\"]([^'\"]*)['\"])?\)"#).unwrap();
         if let Some(cap) = re.captures(line) {
             let alt_text = cap.get(1).map(|m| m.as_str().to_string());
             let url = cap.get(2).map(|m| m.as_str().to_string()).unwrap_or_default();
             let title = cap.get(3).map(|m| m.as_str().to_string());
 
-            // Use title if available, otherwise use alt text as caption
             let caption = title.or(alt_text);
 
             return Some(EditorJsBlock::Image {
@@ -363,9 +468,7 @@ impl MarkdownParser {
         }
 
         let mut text = lines.join(" ");
-        // Convert markdown inline formatting (bold, italic, strikethrough)
         text = self.convert_inline_formatting(&text);
-        // Convert markdown links to HTML links with target="_blank"
         text = self.convert_markdown_links(&text);
         
         (text, i)
@@ -419,15 +522,112 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_heading() {
-        let md = "# Hello";
+    fn test_parse_unordered_list() {
+        let md = "- Item 1\n- Item 2\n- Item 3";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert_eq!(data.style, "unordered");
+            assert_eq!(data.items.len(), 3);
+        } else {
+            panic!("Expected list block");
+        }
     }
 
     #[test]
-    fn test_parse_list() {
-        let md = "- Item 1\n- Item 2";
+    fn test_parse_ordered_list() {
+        let md = "1. Item 1\n2. Item 2\n3. Item 3";
+        let blocks = markdown_to_editorjs(md).unwrap();
+        assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert_eq!(data.style, "ordered");
+            assert_eq!(data.items.len(), 3);
+        } else {
+            panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_unordered_list() {
+        let md = "- Item 1\n- Item 2\n    - Nested 1\n    - Nested 2\n- Item 3";
+        let blocks = markdown_to_editorjs(md).unwrap();
+        assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert_eq!(data.style, "unordered");
+            assert_eq!(data.items.len(), 3);
+            assert_eq!(data.items[1].items.len(), 2);
+            assert_eq!(data.items[1].items[0].content, "Nested 1");
+        } else {
+            panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_ordered_list() {
+        let md = "1. Item 1\n2. Item 2\n    1. Nested 1\n    2. Nested 2\n3. Item 3";
+        let blocks = markdown_to_editorjs(md).unwrap();
+        assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert_eq!(data.style, "ordered");
+            assert_eq!(data.items.len(), 3);
+            assert_eq!(data.items[1].items.len(), 2);
+        } else {
+            panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_parse_checklist() {
+        let md = "- [ ] Unchecked\n- [x] Checked\n- [ ] Unchecked 2";
+        let blocks = markdown_to_editorjs(md).unwrap();
+        assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert_eq!(data.style, "checklist");
+            assert_eq!(data.items.len(), 3);
+            assert_eq!(data.items[0].meta.checked, Some(false));
+            assert_eq!(data.items[1].meta.checked, Some(true));
+        } else {
+            panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_list_with_formatting() {
+        let md = "- **Bold** item\n- _Italic_ item\n- ~~Strikethrough~~ item";
+        let blocks = markdown_to_editorjs(md).unwrap();
+        assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert!(data.items[0].content.contains("<b>Bold</b>"));
+            assert!(data.items[1].content.contains("<i>Italic</i>"));
+            assert!(data.items[2].content.contains("<s>Strikethrough</s>"));
+        } else {
+            panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_list_with_links() {
+        let md = "- [Link 1](https://example.com)\n- [Link 2](https://example.com)";
+        let blocks = markdown_to_editorjs(md).unwrap();
+        assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert!(data.items[0].content.contains(r#"<a href="https://example.com" target="_blank">Link 1</a>"#));
+            assert!(data.items[1].content.contains(r#"<a href="https://example.com" target="_blank">Link 2</a>"#));
+        } else {
+            panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_parse_heading() {
+        let md = "# Hello";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
     }

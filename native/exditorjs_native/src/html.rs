@@ -1,7 +1,6 @@
 use crate::error::{Error, Result};
 use crate::models::*;
 use regex::Regex;
-use std::collections::VecDeque;
 
 /// Convert HTML to Editor.js blocks
 pub fn html_to_editorjs(html: &str) -> Result<Vec<EditorJsBlock>> {
@@ -22,52 +21,60 @@ impl HtmlParser {
 
     fn parse(&self) -> Result<Vec<EditorJsBlock>> {
         let mut blocks = Vec::new();
-        let _html = self.html.trim();
+        let html = self.html.trim();
+        let mut pos = 0;
 
-        // Use non-capturing groups and match any closing tag
-        let re = Regex::new(r"<([^/>]+)([^>]*)>(.*?)</[^>]+>").unwrap();
-        let mut last_end = 0;
+        while pos < html.len() {
+            // Skip whitespace
+            while pos < html.len() && html.chars().nth(pos).map_or(false, |c| c.is_whitespace()) {
+                pos += 1;
+            }
 
-        for cap in re.captures_iter(&self.html) {
-            let tag = cap.get(1).map(|m| m.as_str()).unwrap_or("");
-            let attrs = cap.get(2).map(|m| m.as_str()).unwrap_or("");
-            let content = cap.get(3).map(|m| m.as_str()).unwrap_or("");
-            let full_match = cap.get(0).unwrap();
+            if pos >= html.len() {
+                break;
+            }
 
-            // Handle text before the tag
-            if last_end < full_match.start() {
-                let text = &self.html[last_end..full_match.start()].trim();
-                if !text.is_empty() {
-                    blocks.push(EditorJsBlock::Paragraph {
-                        data: ParagraphData {
-                            text: self.clean_html(text),
-                        },
-                    });
+            // Check if we're at a tag
+            if html.chars().nth(pos).map_or(false, |c| c == '<') {
+                // Find the end of the tag
+                if let Some(tag_end) = html[pos..].find('>') {
+                    let tag_full = &html[pos..pos + tag_end + 1];
+                    
+                    // Parse the tag
+                    if let Some(block) = self.parse_element(&html, &mut pos) {
+                        blocks.push(block);
+                    } else {
+                        pos += tag_end + 1;
+                    }
+                } else {
+                    pos += 1;
+                }
+            } else {
+                // Text content outside tags
+                if let Some(tag_pos) = html[pos..].find('<') {
+                    let text = html[pos..pos + tag_pos].trim();
+                    if !text.is_empty() {
+                        blocks.push(EditorJsBlock::Paragraph {
+                            data: ParagraphData {
+                                text: self.clean_html(text),
+                            },
+                        });
+                    }
+                    pos += tag_pos;
+                } else {
+                    let text = html[pos..].trim();
+                    if !text.is_empty() {
+                        blocks.push(EditorJsBlock::Paragraph {
+                            data: ParagraphData {
+                                text: self.clean_html(text),
+                            },
+                        });
+                    }
+                    break;
                 }
             }
-
-            // Parse the tag
-            let block = self.parse_tag(tag, attrs, content)?;
-            if let Some(b) = block {
-                blocks.push(b);
-            }
-
-            last_end = full_match.end();
         }
 
-        // Handle remaining text
-        if last_end < self.html.len() {
-            let text = &self.html[last_end..].trim();
-            if !text.is_empty() {
-                blocks.push(EditorJsBlock::Paragraph {
-                    data: ParagraphData {
-                        text: self.clean_html(text),
-                    },
-                });
-            }
-        }
-
-        // If no blocks were created, treat entire HTML as raw
         if blocks.is_empty() {
             blocks.push(EditorJsBlock::Raw {
                 data: RawData {
@@ -79,12 +86,67 @@ impl HtmlParser {
         Ok(blocks)
     }
 
+    fn parse_element(&self, html: &str, pos: &mut usize) -> Option<EditorJsBlock> {
+        if !html.chars().nth(*pos).map_or(false, |c| c == '<') {
+            return None;
+        }
+
+        let tag_start = *pos;
+        
+        // Find tag end
+        let tag_end = html[tag_start..].find('>')?;
+        let tag_content = &html[tag_start + 1..tag_start + tag_end];
+        
+        // Self-closing or void tags
+        if tag_content.ends_with('/') || tag_content.starts_with("img ") || tag_content.starts_with("br") || tag_content.starts_with("hr") {
+            *pos = tag_start + tag_end + 1;
+            
+            if tag_content.starts_with("img") {
+                if let Ok(Some(block)) = self.parse_image(tag_content) {
+                    return Some(block);
+                }
+            } else if tag_content.starts_with("hr") {
+                return Some(EditorJsBlock::Delimiter {});
+            }
+            return None;
+        }
+
+        // Extract tag name and attributes
+        let parts: Vec<&str> = tag_content.split_whitespace().collect();
+        if parts.is_empty() {
+            return None;
+        }
+
+        let tag_name = parts[0];
+        let attrs = if parts.len() > 1 {
+            tag_content[tag_name.len()..].trim()
+        } else {
+            ""
+        };
+
+        // Find closing tag
+        let closing_tag = format!("</{}>", tag_name);
+        let content_start = tag_start + tag_end + 1;
+        
+        if let Some(closing_pos) = html[content_start..].find(&closing_tag) {
+            let content = &html[content_start..content_start + closing_pos];
+            *pos = content_start + closing_pos + closing_tag.len();
+            
+            if let Ok(Some(block)) = self.parse_tag(tag_name, attrs, content) {
+                return Some(block);
+            }
+        }
+
+        None
+    }
+
     fn parse_tag(&self, tag: &str, attrs: &str, content: &str) -> Result<Option<EditorJsBlock>> {
         let content = content.trim();
+        let tag_lower = tag.to_lowercase();
 
-        match tag.to_lowercase().as_str() {
+        match tag_lower.as_str() {
             "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-                let level = tag.chars().nth(1).unwrap().to_digit(10).unwrap_or(1) as u8;
+                let level = tag_lower.chars().nth(1).unwrap().to_digit(10).unwrap_or(1) as u8;
                 Ok(Some(EditorJsBlock::Heading {
                     data: HeadingData {
                         text: self.clean_html(content),
@@ -92,51 +154,130 @@ impl HtmlParser {
                     },
                 }))
             }
-            "p" => Ok(Some(EditorJsBlock::Paragraph {
-                data: ParagraphData {
-                    text: self.clean_html(content),
-                },
-            })),
-            "blockquote" => Ok(Some(EditorJsBlock::Quote {
-                data: QuoteData {
-                    text: self.clean_html(content),
-                    caption: None,
-                    alignment: "left".to_string(),
-                },
-            })),
-            "code" | "pre" => Ok(Some(EditorJsBlock::Code {
-                data: CodeData {
-                    code: content.to_string(),
-                    language: self.extract_language(attrs),
-                },
-            })),
-            "ul" => Ok(Some(self.parse_list(content, "unordered")?)),
-            "ol" => Ok(Some(self.parse_list(content, "ordered")?)),
-            "img" => Ok(Some(self.parse_image(attrs)?)),
-            "table" => Ok(Some(self.parse_table(content)?)),
+            "p" | "div" | "span" => {
+                let text = self.clean_html(content);
+                if !text.is_empty() {
+                    Ok(Some(EditorJsBlock::Paragraph {
+                        data: ParagraphData { text },
+                    }))
+                } else {
+                    Ok(None)
+                }
+            }
+            "blockquote" => {
+                Ok(Some(EditorJsBlock::Quote {
+                    data: QuoteData {
+                        text: self.clean_html(content),
+                        caption: None,
+                        alignment: "left".to_string(),
+                    },
+                }))
+            }
+            "code" | "pre" => {
+                Ok(Some(EditorJsBlock::Code {
+                    data: CodeData {
+                        code: content.to_string(),
+                        language: self.extract_language(attrs),
+                    },
+                }))
+            }
+            "ul" => {
+                let block = self.parse_list(content, "unordered")?;
+                Ok(Some(block))
+            }
+            "ol" => {
+                let block = self.parse_list(content, "ordered")?;
+                Ok(Some(block))
+            }
+            "table" => {
+                let block = self.parse_table(content)?;
+                Ok(Some(block))
+            }
             "hr" => Ok(Some(EditorJsBlock::Delimiter {})),
+            "li" => {
+                // Skip li tags when parsing as we handle them in list parsing
+                Ok(None)
+            }
             _ => Ok(None),
         }
     }
 
     fn parse_list(&self, content: &str, style: &str) -> Result<EditorJsBlock> {
-        let re = Regex::new(r"<li[^>]*>(.*?)</li>").unwrap();
-        let items: Vec<String> = re
-            .captures_iter(content)
-            .filter_map(|cap| cap.get(1).map(|m| self.clean_html(m.as_str())))
-            .collect();
+        let items = self.parse_list_items(content, style);
 
-        Ok(EditorJsBlock::List {
-            data: ListData {
+        let data = if style == "ordered" {
+            ListData {
+                style: "ordered".to_string(),
+                items,
+                meta: Some(ListMeta {
+                    start: Some(1),
+                    counterType: None,
+                }),
+            }
+        } else {
+            ListData {
                 style: style.to_string(),
                 items,
-            },
-        })
+                meta: None,
+            }
+        };
+
+        Ok(EditorJsBlock::List { data })
     }
 
-    fn parse_image(&self, attrs: &str) -> Result<EditorJsBlock> {
+    fn parse_list_items(&self, content: &str, _style: &str) -> Vec<ListItem> {
+        let mut items = Vec::new();
+        let li_re = Regex::new(r"<li[^>]*>(.*?)</li>").unwrap();
+
+        for cap in li_re.captures_iter(content) {
+            let li_content = cap.get(1).unwrap().as_str();
+            
+            // Check for nested lists
+            let nested_ul_re = Regex::new(r"<ul[^>]*>(.*?)</ul>").unwrap();
+            let nested_ol_re = Regex::new(r"<ol[^>]*>(.*?)</ol>").unwrap();
+            
+            let mut item_text = li_content.to_string();
+            let mut nested_items = Vec::new();
+
+            // Extract and remove nested unordered list
+            if let Some(nested_cap) = nested_ul_re.captures(li_content) {
+                let nested_content = nested_cap.get(1).unwrap().as_str();
+                item_text = nested_ul_re.replace(&item_text, "").to_string();
+                nested_items = self.parse_list_items(nested_content, "unordered");
+            }
+            // Extract and remove nested ordered list
+            else if let Some(nested_cap) = nested_ol_re.captures(li_content) {
+                let nested_content = nested_cap.get(1).unwrap().as_str();
+                item_text = nested_ol_re.replace(&item_text, "").to_string();
+                nested_items = self.parse_list_items(nested_content, "ordered");
+            }
+
+            let cleaned_text = self.clean_html(item_text.trim());
+            
+            // Check if this is a checklist item (look for input type="checkbox")
+            let checked = if li_content.contains("type=\"checkbox\"") {
+                if li_content.contains("checked") {
+                    Some(true)
+                } else {
+                    Some(false)
+                }
+            } else {
+                None
+            };
+
+            items.push(ListItem {
+                content: cleaned_text,
+                meta: ListItemMeta { checked },
+                items: nested_items,
+            });
+        }
+
+        items
+    }
+
+    fn parse_image(&self, attrs: &str) -> Result<Option<EditorJsBlock>> {
         let src_re = Regex::new(r#"src=["']?([^"'\s>]+)["']?"#).unwrap();
-        let alt_re = Regex::new(r#"alt=["']?([^"'\s>]+)["']?"#).unwrap();
+        let alt_re = Regex::new(r#"alt=["']([^"']*)["']"#).unwrap();
 
         let url = src_re
             .captures(attrs)
@@ -144,12 +285,17 @@ impl HtmlParser {
             .map(|m| m.as_str().to_string())
             .unwrap_or_default();
 
+        if url.is_empty() {
+            return Ok(None);
+        }
+
         let caption = alt_re
             .captures(attrs)
             .and_then(|cap| cap.get(1))
-            .map(|m| m.as_str().to_string());
+            .map(|m| m.as_str().to_string())
+            .and_then(|s| if s.is_empty() { None } else { Some(s) });
 
-        Ok(EditorJsBlock::Image {
+        Ok(Some(EditorJsBlock::Image {
             data: ImageData {
                 url,
                 caption,
@@ -157,7 +303,7 @@ impl HtmlParser {
                 withBackground: None,
                 stretched: None,
             },
-        })
+        }))
     }
 
     fn parse_table(&self, content: &str) -> Result<EditorJsBlock> {
@@ -195,11 +341,8 @@ impl HtmlParser {
     }
 
     fn clean_html(&self, text: &str) -> String {
-        // Remove HTML tags
         let re = Regex::new(r"<[^>]+>").unwrap();
         let cleaned = re.replace_all(text, "");
-
-        // Decode HTML entities
         self.decode_entities(&cleaned)
     }
 
@@ -236,9 +379,64 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_list() {
-        let html = "<ul><li>Item 1</li><li>Item 2</li></ul>";
+    fn test_parse_simple_unordered_list() {
+        let html = "<ul><li>First item</li><li>Second item</li><li>Third item</li></ul>";
         let blocks = html_to_editorjs(html).unwrap();
         assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert_eq!(data.style, "unordered");
+            assert_eq!(data.items.len(), 3);
+            assert_eq!(data.items[0].content, "First item");
+            assert_eq!(data.items[1].content, "Second item");
+            assert_eq!(data.items[2].content, "Third item");
+        } else {
+            panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_parse_simple_ordered_list() {
+        let html = "<ol><li>Item 1</li><li>Item 2</li></ol>";
+        let blocks = html_to_editorjs(html).unwrap();
+        assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert_eq!(data.style, "ordered");
+            assert_eq!(data.items.len(), 2);
+        } else {
+            panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_unordered_list() {
+        let html = "<ul><li>Item 1</li><li>Item 2<ul><li>Nested 1</li><li>Nested 2</li></ul></li><li>Item 3</li></ul>";
+        let blocks = html_to_editorjs(html).unwrap();
+        assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert_eq!(data.style, "unordered");
+            assert_eq!(data.items.len(), 3);
+            assert_eq!(data.items[1].items.len(), 2);
+            assert_eq!(data.items[1].items[0].content, "Nested 1");
+        } else {
+            panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_ordered_list() {
+        let html = "<ol><li>Item 1</li><li>Item 2<ol><li>Nested 1</li><li>Nested 2</li></ol></li><li>Item 3</li></ol>";
+        let blocks = html_to_editorjs(html).unwrap();
+        assert_eq!(blocks.len(), 1);
+        
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert_eq!(data.style, "ordered");
+            assert_eq!(data.items.len(), 3);
+            assert_eq!(data.items[1].items.len(), 2);
+        } else {
+            panic!("Expected list block");
+        }
     }
 }

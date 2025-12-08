@@ -16,7 +16,6 @@ pub fn generate_block_id() -> String {
     hasher.write_u128(timestamp);
     let hash = hasher.finish();
     
-    // Generate alphanumeric ID similar to Editor.js
     let chars: Vec<char> = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
         .chars()
         .collect();
@@ -126,9 +125,32 @@ pub struct HeadingData {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct ListMeta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub counterType: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Default)]
+pub struct ListItemMeta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checked: Option<bool>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct ListItem {
+    pub content: String,
+    pub meta: ListItemMeta,
+    pub items: Vec<ListItem>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ListData {
     pub style: String,
-    pub items: Vec<String>,
+    pub items: Vec<ListItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<ListMeta>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]

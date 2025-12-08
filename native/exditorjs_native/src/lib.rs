@@ -65,7 +65,8 @@ mod atoms {
 fn html_to_editorjs_nif(env: rustler::Env, html: String) -> NifResult<rustler::Term<'_>> {
     match html_to_editorjs(&html) {
         Ok(blocks) => {
-            match serde_json::to_string(&blocks) {
+            let document = EditorJsDocument::new(blocks);
+            match serde_json::to_string(&document) {
                 Ok(json) => Ok((atoms::ok(), json).encode(env)),
                 Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new("json_encode_error"))),
             }
@@ -79,7 +80,8 @@ fn html_to_editorjs_nif(env: rustler::Env, html: String) -> NifResult<rustler::T
 fn markdown_to_editorjs_nif(env: rustler::Env, markdown: String) -> NifResult<rustler::Term<'_>> {
     match markdown_to_editorjs(&markdown) {
         Ok(blocks) => {
-            match serde_json::to_string(&blocks) {
+            let document = EditorJsDocument::new(blocks);
+            match serde_json::to_string(&document) {
                 Ok(json) => Ok((atoms::ok(), json).encode(env)),
                 Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new("json_encode_error"))),
             }
