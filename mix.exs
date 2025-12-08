@@ -8,20 +8,14 @@ defmodule ExditorJS.MixProject do
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: Mix.compilers(),
-      rustler_crates: rustler_crates()
-    ]
-  end
-
-  defp rustler_crates do
-    [
-      exditorjs_native: []
+      compilers: Mix.compilers()
     ]
   end
 
   defp deps do
     [
       {:rustler, "~> 0.37.1"},
+      {:rustler_precompiled, "~> 0.8.3"},
       {:jason, "~> 1.4"}
     ]
   end

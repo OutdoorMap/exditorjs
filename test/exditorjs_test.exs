@@ -90,6 +90,8 @@ defmodule ExditorJSTest do
       """
       {:ok, blocks} = ExditorJS.markdown_to_editorjs(markdown)
       
+      IO.inspect(blocks, label: "Blocks")
+
       assert is_list(blocks)
       assert length(blocks) > 0
     end

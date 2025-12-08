@@ -7,7 +7,17 @@ defmodule ExditorJS do
   EditorJS block format, which can be used with the Editor.js library.
   """
 
-  use Rustler, otp_app: :exditorjs, crate: :exditorjs_native
+  version = Mix.Project.config()[:version]
+
+  use RustlerPrecompiled,
+    otp_app: :exditorjs,
+    crate: "exditorjs_native",
+    base_url: "https://github.com/pjullrich/exditorjs/releases/download/v#{version}",
+    force_build: true, # System.get_env("RUSTLER_FORCE_BUILD") in ["1", "true"],
+    targets:
+      Enum.uniq(["aarch64-unknown-linux-musl" | RustlerPrecompiled.Config.default_targets()]),
+    version: version
+
 
   @doc """
   Converts HTML to EditorJS blocks format.

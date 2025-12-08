@@ -24,8 +24,8 @@ impl HtmlParser {
         let mut blocks = Vec::new();
         let _html = self.html.trim();
 
-        // Simple regex-based HTML parsing
-        let re = Regex::new(r"<([^/>]+)([^>]*)>(.*?)</\1>").unwrap();
+        // Use non-capturing groups and match any closing tag
+        let re = Regex::new(r"<([^/>]+)([^>]*)>(.*?)</[^>]+>").unwrap();
         let mut last_end = 0;
 
         for cap in re.captures_iter(&self.html) {
