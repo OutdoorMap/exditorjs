@@ -25,7 +25,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-editorjs-converter = "0.1"
+exditorjs_native = "0.1"
 ```
 
 ## Usage

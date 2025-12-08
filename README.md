@@ -1,4 +1,4 @@
-# editorjs-converter
+# exditorjs
 
 This Elixir library provides functionality to convert Markdown and HTML into Editor.js JSON format using a Rust backend for performance.
 
@@ -9,7 +9,7 @@ To use the `exditorjs_native` library in your Elixir project, add it to your `mi
 ```elixir
 defp deps do
   [
-    {:exditorjs_native, git: "https://github.com/yourusername/editorjs-converter.git"}
+    {:exditorjs_native, git: "https://github.com/OutdoorMap/exditorjs.git"}
   ]
 end
 ```
@@ -28,14 +28,48 @@ After installing the library, you can use it to convert Markdown or HTML to Edit
 
 ```elixir
 markdown_input = "# Hello World"
-json_output = EditorjsConverter.convert_markdown(markdown_input)
+{:ok, json_output} = ExditorJS.markdown_to_editorjs(markdown_input)
+```
+
+Returns
+
+```
+{:ok,
+ %{
+   "blocks" => [
+     %{
+       "data" => %{"level" => 1, "text" => "Hello World"},
+       "id" => "jFAGy00fr2",
+       "type" => "heading"
+     }
+   ],
+   "time" => 1765198639892,
+   "version" => "2.25.0"
+ }}
 ```
 
 ### Converting HTML
 
 ```elixir
 html_input = "<h1>Hello World</h1>"
-json_output = EditorjsConverter.convert_html(html_input)
+{:ok, json_output} = ExditorJS.html_to_editorjs(html_input)
+```
+
+Returns
+
+```
+{:ok,
+ %{
+   "blocks" => [
+     %{
+       "data" => %{"level" => 1, "text" => "Hello World"},
+       "id" => "MpNdrP5nOK",
+       "type" => "heading"
+     }
+   ],
+   "time" => 1765198666516,
+   "version" => "2.25.0"
+ }}
 ```
 
 ## Contributing
