@@ -1,0 +1,94 @@
+//! ExditorJS Native
+//!
+//! A Rust library for converting HTML and Markdown to Editor.js JSON format.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use exditorjs_native::{html_to_editorjs, markdown_to_editorjs};
+//!
+//! let html = "<h1>Hello</h1><p>World</p>";
+//! let blocks = html_to_editorjs(html).unwrap();
+//! println!("{}", serde_json::to_string(&blocks).unwrap());
+//!
+//! let markdown = "# Hello\n\nWorld";
+//! let blocks = markdown_to_editorjs(markdown).unwrap();
+//! println!("{}", serde_json::to_string(&blocks).unwrap());
+//! ```
+
+extern crate rustler;
+
+pub mod blocks;
+pub mod error;
+pub mod html;
+pub mod markdown;
+pub mod models;
+
+use rustler::{NifResult, Encoder};
+pub use error::{Error, Result};
+pub use html::html_to_editorjs;
+pub use markdown::markdown_to_editorjs;
+pub use models::{EditorJsBlock, EditorJsBlockWithId};
+
+/// Represents an Editor.js document with proper structure
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct EditorJsDocument {
+    pub time: i64,
+    pub blocks: Vec<EditorJsBlockWithId>,
+    pub version: String,
+}
+
+impl EditorJsDocument {
+    /// Create a new Editor.js document from blocks
+    pub fn new(blocks: Vec<EditorJsBlock>) -> Self {
+        EditorJsDocument {
+            time: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as i64,
+            blocks: blocks.into_iter().map(|b| b.with_id()).collect(),
+            version: "2.25.0".to_string(),
+        }
+    }
+}
+
+// Rustler atoms
+mod atoms {
+    rustler::atoms! {
+        ok,
+        error,
+    }
+}
+
+// NIF function to convert HTML to EditorJS
+#[rustler::nif(schedule = "DirtyCpu")]
+fn html_to_editorjs_nif(env: rustler::Env, html: String) -> NifResult<rustler::Term<'_>> {
+    match html_to_editorjs(&html) {
+        Ok(blocks) => {
+            match serde_json::to_string(&blocks) {
+                Ok(json) => Ok((atoms::ok(), json).encode(env)),
+                Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new("json_encode_error"))),
+            }
+        }
+        Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new("conversion_error"))),
+    }
+}
+
+// NIF function to convert Markdown to EditorJS
+#[rustler::nif(schedule = "DirtyCpu")]
+fn markdown_to_editorjs_nif(env: rustler::Env, markdown: String) -> NifResult<rustler::Term<'_>> {
+    match markdown_to_editorjs(&markdown) {
+        Ok(blocks) => {
+            match serde_json::to_string(&blocks) {
+                Ok(json) => Ok((atoms::ok(), json).encode(env)),
+                Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new("json_encode_error"))),
+            }
+        }
+        Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new("conversion_error"))),
+    }
+}
+
+rustler::init!(
+    "Elixir.ExditorJS",
+    [html_to_editorjs_nif, markdown_to_editorjs_nif]
+);
