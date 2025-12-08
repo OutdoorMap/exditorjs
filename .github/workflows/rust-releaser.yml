@@ -1,146 +1,90 @@
-name: Build precompiled NIFs
-
-env:
-  NIF_DIRECTORY: "native/exditorjs_native"
-  SKIP_EDITORJS_BUILD: "true"
+name: Build precompiled NIFs and Release
 
 on:
   push:
     tags:
-      - '*'
-
-defaults:
-  run:
-    working-directory: "./native/exditorjs_native"
+      - "*"
+  workflow_dispatch:
 
 jobs:
   build_release:
     name: NIF ${{ matrix.nif }} - ${{ matrix.job.target }} (${{ matrix.job.os }})
     runs-on: ${{ matrix.job.os }}
+
+    # permissions:
+    #   contents: write
+    #   id-token: write
+    #   attestations: write
+
     strategy:
       fail-fast: false
       matrix:
         nif: ["2.15"]
         job:
-          - { target: aarch64-unknown-linux-gnu   , os: ubuntu-20.04 , use-cross: true }
-          - { target: aarch64-unknown-linux-musl  , os: ubuntu-20.04 , use-cross: true }
-          - { target: aarch64-apple-darwin        , os: macos-latest }
-          - { target: arm-unknown-linux-gnueabihf , os: ubuntu-20.04 , use-cross: true }
-          - { target: riscv64gc-unknown-linux-gnu , os: ubuntu-20.04 , use-cross: true }
-          - { target: x86_64-apple-darwin         , os: macos-latest }
-          - { target: x86_64-unknown-linux-gnu    , os: ubuntu-20.04 }
-          - { target: x86_64-unknown-linux-musl   , os: ubuntu-20.04 , use-cross: true }
-          - { target: x86_64-pc-windows-gnu       , os: windows-2019 }
-          - { target: x86_64-pc-windows-msvc      , os: windows-2019 }
-
-    env:
-      RUSTLER_NIF_VERSION: ${{ matrix.nif }}
+          - { target: arm-unknown-linux-gnueabihf, os: ubuntu-24.04, use-cross: true }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-24.04, use-cross: true }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04, use-cross: true }
+          - { target: aarch64-apple-darwin, os: macos-15 }
+          - { target: riscv64gc-unknown-linux-gnu, os: ubuntu-24.04, use-cross: true }
+          - { target: x86_64-apple-darwin, os: macos-15 }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-24.04 }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-24.04, use-cross: true }
+          - { target: x86_64-pc-windows-gnu, os: windows-2025 }
+          - { target: x86_64-pc-windows-msvc, os: windows-2025 }
 
     steps:
-    - name: Checkout source code
-      uses: actions/checkout@v2
+      - name: Checkout source code
+        uses: actions/checkout@v5
 
-    - name: Install prerequisites
-      shell: bash
-      run: |
-        case ${{ matrix.job.target }} in
-          arm-unknown-linux-*) sudo apt-get -y update ; sudo apt-get -y install gcc-arm-linux-gnueabihf ;;
-          aarch64-unknown-linux-gnu) sudo apt-get -y update ; sudo apt-get -y install gcc-aarch64-linux-gnu ;;
-        esac
-    - name: Extract crate information
-      shell: bash
-      run: |
-        echo "PROJECT_NAME=$(sed -n 's/^name = "\(.*\)"/\1/p' Cargo.toml | head -n1)" >> $GITHUB_ENV
-        # Get the project version from mix.exs
-        echo "PROJECT_VERSION=$(sed -n 's/^  @version "\(.*\)"/\1/p' ../../mix.exs | head -n1)" >> $GITHUB_ENV
+      - name: Extract project version
+        shell: bash
+        run: |
+          # Get the project version from mix.exs
+          echo "PROJECT_VERSION=$(sed -n 's/^  @version "\(.*\)"/\1/p' ../../mix.exs | head -n1)" >> $GITHUB_ENV
 
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        target: ${{ matrix.job.target }}
-        override: true
-        profile: minimal
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          target: ${{ matrix.job.target }}
 
-    - name: Show version
-      shell: bash
-      run: |
-        gcc --version || true
-        rustup -V
-        rustup toolchain list
-        rustup default
-        cargo -V
-        rustc -V
-        rustc --print=cfg
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: v0-precomp
+          shared-key: ${{ matrix.job.target }}-${{ matrix.nif }}
+          workspaces: |
+            native/exditorjs_native
 
-    - name: Download cross
-      uses: giantswarm/install-binary-action@v1.0.0
-      if: ${{ matrix.job.use-cross }}
-      with:
-        binary: "cross"
-        version: "v0.2.4"
-        download_url: "https://github.com/cross-rs/cross/releases/download/${version}/cross-x86_64-unknown-linux-gnu.tar.gz"
-        tarball_binary_path: "${binary}"
-        smoke_test: "${binary} --version"
+      - name: Set Rust stack size
+        shell: bash
+        run: |
+          echo "RUST_MIN_STACK=16777216" >> $GITHUB_ENV
 
-    - name: Build lib
-      shell: bash
-      run: |
-        if [ "${{ matrix.job.use-cross }}" == "true" ]; then
-          cross build --release --target=${{ matrix.job.target }}
-        else
-          cargo build --release --target=${{ matrix.job.target }}
-        fi
+      - name: Build the project
+        id: build-crate
+        uses: philss/rustler-precompiled-action@v1.1.4
+        with:
+          project-name: exditorjs_native
+          project-version: ${{ env.PROJECT_VERSION }}
+          target: ${{ matrix.job.target }}
+          nif-version: ${{ matrix.nif }}
+          use-cross: ${{ matrix.job.use-cross }}
+          project-dir: "native/exditorjs_native"
 
-    - name: Rename lib
-      id: rename
-      shell: bash
-      run: |
-        LIB_PREFIX="lib"
-        case ${{ matrix.job.target }} in
-          *-pc-windows-*) LIB_PREFIX="" ;;
-        esac;
-        # Figure out suffix of lib
-        # See: https://doc.rust-lang.org/reference/linkage.html
-        LIB_SUFFIX=".so"
-        case ${{ matrix.job.target }} in
-          *-apple-darwin) LIB_SUFFIX=".dylib" ;;
-          *-pc-windows-*) LIB_SUFFIX=".dll" ;;
-        esac;
-        CICD_INTERMEDIATES_DIR=$(mktemp -d)
-        # Setup paths
-        LIB_DIR="${CICD_INTERMEDIATES_DIR}/released-lib"
-        mkdir -p "${LIB_DIR}"
-        LIB_NAME="${LIB_PREFIX}${{ env.PROJECT_NAME }}${LIB_SUFFIX}"
-        LIB_PATH="${LIB_DIR}/${LIB_NAME}"
-        # Copy the release build lib to the result location
-        cp "target/${{ matrix.job.target }}/release/${LIB_NAME}" "${LIB_DIR}"
-        # Final paths
-        # In the end we use ".so" for MacOS in the final build
-        # See: https://www.erlang.org/doc/man/erlang.html#load_nif-2
-        LIB_FINAL_SUFFIX="${LIB_SUFFIX}"
-        case ${{ matrix.job.target }} in
-          *-apple-darwin) LIB_FINAL_SUFFIX=".so" ;;
-        esac;
-        LIB_FINAL_NAME="${LIB_PREFIX}${PROJECT_NAME}-v${PROJECT_VERSION}-nif-${RUSTLER_NIF_VERSION}-${{ matrix.job.target }}${LIB_FINAL_SUFFIX}"
-        # Copy lib to final name on this directory
-        cp "${LIB_PATH}" "${LIB_FINAL_NAME}"
-        tar -cvzf "${LIB_FINAL_NAME}.tar.gz" "${LIB_FINAL_NAME}"
-        # Passes the path relative to the root of the project.
-        LIB_FINAL_PATH="${NIF_DIRECTORY}/${LIB_FINAL_NAME}.tar.gz"
-        # Let subsequent steps know where to find the lib
-        echo ::set-output name=LIB_FINAL_PATH::${LIB_FINAL_PATH}
-        echo ::set-output name=LIB_FINAL_NAME::${LIB_FINAL_NAME}.tar.gz
+      # - name: Artifact attestation
+      #   uses: actions/attest-build-provenance@v1
+      #   with:
+      #     subject-path: ${{ steps.build-crate.outputs.file-path }}
 
-    - name: "Upload artifact"
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ steps.rename.outputs.LIB_FINAL_NAME }}
-        path: ${{ steps.rename.outputs.LIB_FINAL_PATH }}
+      - name: Artifact upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build-crate.outputs.file-name }}
+          path: ${{ steps.build-crate.outputs.file-path }}
 
-    - name: Publish archives and packages
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          ${{ steps.rename.outputs.LIB_FINAL_PATH }}
-      if: startsWith(github.ref, 'refs/tags/')
+      - name: Publish archives and packages
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.build-crate.outputs.file-path }}
+        if: startsWith(github.ref, 'refs/tags/')

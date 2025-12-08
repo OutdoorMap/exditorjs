@@ -1,10 +1,12 @@
 defmodule ExditorJS.MixProject do
   use Mix.Project
 
+  @version "0.1.3"
+
   def project do
     [
       app: :exditorjs,
-      version: "0.1.2",
+      version: @version,
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),

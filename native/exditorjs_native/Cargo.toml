@@ -1,6 +1,6 @@
 [package]
 name = "exditorjs_native"
-version = "0.1.0"
+version = "0.1.3"
 authors = []
 edition = "2021"
 
@@ -21,3 +21,6 @@ default = ["nif_version_2_15"]
 nif_version_2_15 = ["rustler/nif_version_2_15"]
 nif_version_2_16 = ["rustler/nif_version_2_16"]
 nif_version_2_17 = ["rustler/nif_version_2_17"]
+
+[build.env]
+passthrough = ["RUST_MIN_STACK"]
