@@ -19,11 +19,13 @@
 extern crate rustler;
 
 pub mod blocks;
+pub mod embed;
 pub mod error;
 pub mod html;
 pub mod markdown;
 pub mod models;
 
+pub use embed::{detect_embed_service, detect_service_from_src, parse_iframe};
 pub use error::{Error, Result};
 pub use html::html_to_editorjs;
 pub use markdown::markdown_to_editorjs;

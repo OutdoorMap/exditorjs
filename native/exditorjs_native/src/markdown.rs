@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::models::*;
+use crate::embed::detect_embed_service;
 use regex::Regex;
 
 /// Convert Markdown to Editor.js blocks
@@ -81,6 +82,13 @@ impl MarkdownParser {
             // Check for images
             if let Some(image_block) = self.parse_image_markdown(line) {
                 blocks.push(image_block);
+                i += 1;
+                continue;
+            }
+
+            // Check for embed links
+            if let Some(embed_block) = self.parse_embed_link(line) {
+                blocks.push(embed_block);
                 i += 1;
                 continue;
             }
@@ -394,6 +402,49 @@ impl MarkdownParser {
                 },
             });
         }
+        None
+    }
+
+    fn parse_embed_link(&self, line: &str) -> Option<EditorJsBlock> {
+        let trimmed = line.trim();
+        
+        // Match standalone URL on its own line
+        let url_re = Regex::new(r"^https?://[^\s]+$").unwrap();
+        if url_re.is_match(trimmed) {
+            if let Some((service, embed_url, width, height)) = detect_embed_service(trimmed) {
+                return Some(EditorJsBlock::Embed {
+                    data: EmbedData {
+                        service,
+                        source: trimmed.to_string(),
+                        embed: embed_url,
+                        width,
+                        height,
+                        caption: None,
+                    },
+                });
+            }
+        }
+
+        // Match markdown link syntax: [text](url)
+        let link_re = Regex::new(r#"\[([^\]]+)\]\(([^)]+)\)"#).unwrap();
+        if let Some(cap) = link_re.captures(trimmed) {
+            let url = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+            let caption = cap.get(1).map(|m| m.as_str().to_string());
+            
+            if let Some((service, embed_url, width, height)) = detect_embed_service(url) {
+                return Some(EditorJsBlock::Embed {
+                    data: EmbedData {
+                        service,
+                        source: url.to_string(),
+                        embed: embed_url,
+                        width,
+                        height,
+                        caption,
+                    },
+                });
+            }
+        }
+
         None
     }
 

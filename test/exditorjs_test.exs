@@ -218,4 +218,111 @@ defmodule ExditorJSTest do
       assert document["version"] == "2.25.0"
     end
   end
+
+  describe "embed support" do
+    test "converts HTML iframe to embed block" do
+      html = ~s|<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" width="560" height="315"></iframe>|
+      {:ok, document} = ExditorJS.html_to_editorjs(html)
+      
+      assert is_list(document["blocks"])
+      assert Enum.any?(document["blocks"], fn block -> block["type"] == "embed" end)
+      
+      embed_block = Enum.find(document["blocks"], fn block -> block["type"] == "embed" end)
+      assert embed_block != nil
+      assert embed_block["data"]["service"] == "youtube"
+      assert embed_block["data"]["width"] == 560
+      assert embed_block["data"]["height"] == 315
+      assert String.contains?(embed_block["data"]["embed"], "dQw4w9WgXcQ")
+    end
+
+    test "converts markdown URL to embed block for YouTube" do
+      markdown = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      embed_block = Enum.find(document["blocks"], fn block -> block["type"] == "embed" end)
+      assert embed_block != nil
+      assert embed_block["data"]["service"] == "youtube"
+    end
+
+    test "converts markdown short URL to embed block for YouTube" do
+      markdown = "https://youtu.be/dQw4w9WgXcQ"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      embed_block = Enum.find(document["blocks"], fn block -> block["type"] == "embed" end)
+      assert embed_block != nil
+      assert embed_block["data"]["service"] == "youtube"
+    end
+
+    test "converts markdown link with caption to embed block for Vimeo" do
+      markdown = "[Watch this](https://vimeo.com/123456789)"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      embed_block = Enum.find(document["blocks"], fn block -> block["type"] == "embed" end)
+      assert embed_block != nil
+      assert embed_block["data"]["service"] == "vimeo"
+      assert embed_block["data"]["caption"] == "Watch this"
+    end
+
+    test "converts Coub URL to embed block" do
+      markdown = "https://coub.com/view/1czcdf"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      embed_block = Enum.find(document["blocks"], fn block -> block["type"] == "embed" end)
+      assert embed_block != nil
+      assert embed_block["data"]["service"] == "coub"
+    end
+
+    test "converts Instagram URL to embed block" do
+      markdown = "https://www.instagram.com/p/ABC123XYZ/"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      embed_block = Enum.find(document["blocks"], fn block -> block["type"] == "embed" end)
+      assert embed_block != nil
+      assert embed_block["data"]["service"] == "instagram"
+    end
+
+    test "converts Twitter URL to embed block" do
+      markdown = "https://twitter.com/user/status/1234567890"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      embed_block = Enum.find(document["blocks"], fn block -> block["type"] == "embed" end)
+      assert embed_block != nil
+      assert embed_block["data"]["service"] == "twitter"
+    end
+
+    test "converts Twitch video URL to embed block" do
+      markdown = "https://twitch.tv/videos/123456789"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      embed_block = Enum.find(document["blocks"], fn block -> block["type"] == "embed" end)
+      assert embed_block != nil
+      assert embed_block["data"]["service"] == "twitch-video"
+    end
+
+    test "converts Twitch channel URL to embed block" do
+      markdown = "https://twitch.tv/channel_name"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      embed_block = Enum.find(document["blocks"], fn block -> block["type"] == "embed" end)
+      assert embed_block != nil
+      assert embed_block["data"]["service"] == "twitch-channel"
+    end
+
+    test "ignores non-embed URLs" do
+      markdown = "https://example.com/some/page"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      # Non-embed URLs should be treated as paragraphs
+      assert is_list(document["blocks"])
+      assert !Enum.any?(document["blocks"], fn block -> block["type"] == "embed" end)
+    end
+  end
 end

@@ -84,6 +84,75 @@ Image blocks support the following fields:
 - `with_background` (optional, boolean): Display image with background (formerly `withBackground`)
 - `stretched` (optional, boolean): Stretch image to full width
 
+### Embed Block
+
+The Embed tool supports embedding content from various services. It automatically detects and converts URLs from supported services into embed blocks.
+
+**Supported Services:**
+- YouTube (youtube.com, youtu.be)
+- Vimeo (vimeo.com)
+- Coub (coub.com)
+- Instagram (instagram.com)
+- Twitter/X (twitter.com, x.com)
+- Twitch (twitch.tv) - both videos and channels
+- CodePen (codepen.io)
+- GitHub Gist (gist.github.com)
+- Figma (figma.com)
+- Miro (miro.com)
+- Imgur (imgur.com)
+- Pinterest (pinterest.com)
+
+**Embed Block Fields:**
+- `service` (string): Service identifier (e.g., "youtube", "vimeo")
+- `source` (string): Original URL
+- `embed` (string): Embed/iframe URL
+- `width` (number): Embed width in pixels
+- `height` (number): Embed height in pixels
+- `caption` (optional): Caption text for the embed
+
+**Usage Examples:**
+
+#### HTML with iframe:
+```elixir
+html_input = ~s|<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" width="560" height="315"></iframe>|
+{:ok, json_output} = ExditorJS.html_to_editorjs(html_input)
+```
+
+Returns:
+```
+{:ok,
+ %{
+   "blocks" => [
+     %{
+       "data" => %{
+         "service" => "youtube",
+         "source" => "https://www.youtube.com/embed/dQw4w9WgXcQ",
+         "embed" => "https://www.youtube.com/embed/dQw4w9WgXcQ",
+         "width" => 560,
+         "height" => 315,
+         "caption" => null
+       },
+       "id" => "aBcDefGhIj",
+       "type" => "embed"
+     }
+   ],
+   "time" => 1765198639892,
+   "version" => "2.25.0"
+ }}
+```
+
+#### Markdown with URL:
+```elixir
+markdown_input = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+{:ok, json_output} = ExditorJS.markdown_to_editorjs(markdown_input)
+```
+
+#### Markdown with link:
+```elixir
+markdown_input = "[Check this out](https://vimeo.com/123456789)"
+{:ok, json_output} = ExditorJS.markdown_to_editorjs(markdown_input)
+```
+
 ### List Block
 
 List blocks support the following fields:
