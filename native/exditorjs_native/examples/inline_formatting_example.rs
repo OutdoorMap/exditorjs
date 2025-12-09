@@ -51,18 +51,18 @@ You can combine multiple formats:
     match markdown_to_editorjs(markdown) {
         Ok(blocks) => {
             let doc = EditorJsDocument::new(blocks);
-            
+
             println!("Output Editor.js JSON:");
             println!("{}\n", serde_json::to_string_pretty(&doc).unwrap());
-            
+
             println!("\nFormatting Summary:");
             println!("===================");
-            
+
             let mut bold_count = 0;
             let mut italic_count = 0;
             let mut strikethrough_count = 0;
             let mut link_count = 0;
-            
+
             for block in doc.blocks.iter() {
                 if let serde_json::Value::Object(data) = &block.data {
                     if let Some(text) = data.get("text") {
@@ -87,7 +87,7 @@ You can combine multiple formats:
                     }
                 }
             }
-            
+
             println!("Bold text instances: {}", bold_count);
             println!("Italic text instances: {}", italic_count);
             println!("Strikethrough instances: {}", strikethrough_count);

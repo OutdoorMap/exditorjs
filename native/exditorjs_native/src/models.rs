@@ -1,5 +1,3 @@
-
-
 /// Generates a unique ID for blocks
 pub fn generate_block_id() -> String {
     use std::collections::hash_map::RandomState;
@@ -10,15 +8,15 @@ pub fn generate_block_id() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    
+
     let mut hasher = RandomState::new().build_hasher();
     hasher.write_u128(timestamp);
     let hash = hasher.finish();
-    
+
     let chars: Vec<char> = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
         .chars()
         .collect();
-    
+
     let mut id = String::new();
     let mut num = hash;
     for _ in 0..10 {
@@ -92,7 +90,9 @@ impl EditorJsBlock {
     /// Convert to block with ID
     pub fn with_id(self) -> EditorJsBlockWithId {
         let (block_type, data) = match self {
-            EditorJsBlock::Paragraph { data } => ("paragraph".to_string(), BlockData::Paragraph(data)),
+            EditorJsBlock::Paragraph { data } => {
+                ("paragraph".to_string(), BlockData::Paragraph(data))
+            }
             EditorJsBlock::Heading { data } => ("heading".to_string(), BlockData::Heading(data)),
             EditorJsBlock::List { data } => ("list".to_string(), BlockData::List(data)),
             EditorJsBlock::Image { data } => ("image".to_string(), BlockData::Image(data)),
@@ -100,7 +100,10 @@ impl EditorJsBlock {
             EditorJsBlock::Quote { data } => ("quote".to_string(), BlockData::Quote(data)),
             EditorJsBlock::Raw { data } => ("raw".to_string(), BlockData::Raw(data)),
             EditorJsBlock::Table { data } => ("table".to_string(), BlockData::Table(data)),
-            EditorJsBlock::Delimiter {} => ("delimiter".to_string(), BlockData::Delimiter(DelimiterData {})),
+            EditorJsBlock::Delimiter {} => (
+                "delimiter".to_string(),
+                BlockData::Delimiter(DelimiterData {}),
+            ),
             EditorJsBlock::Embed { data } => ("embed".to_string(), BlockData::Embed(data)),
         };
 
@@ -127,7 +130,11 @@ pub struct HeadingData {
 pub struct ListMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "counterType", rename = "counterType")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        alias = "counterType",
+        rename = "counterType"
+    )]
     pub counter_type: Option<String>,
 }
 
@@ -157,9 +164,17 @@ pub struct ImageData {
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caption: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "withBorder", rename = "withBorder")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        alias = "withBorder",
+        rename = "withBorder"
+    )]
     pub with_border: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "withBackground", rename = "withBackground")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        alias = "withBackground",
+        rename = "withBackground"
+    )]
     pub with_background: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stretched: Option<bool>,

@@ -95,31 +95,32 @@ fn main() {
 </html>"#;
 
     println!("Converting HTML to Editor.js...\n");
-    
+
     match html_to_editorjs(html) {
         Ok(blocks) => {
             let doc = EditorJsDocument::new(blocks);
-            
+
             println!("✅ Conversion successful!\n");
             println!("Document Statistics:");
             println!("  - Total blocks: {}", doc.blocks.len());
             println!("  - Version: {}", doc.version);
             println!("  - Timestamp: {}", doc.time);
             println!("\nBlocks by type:");
-            
-            let mut block_types: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+            let mut block_types: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
             for block in &doc.blocks {
                 *block_types.entry(block.block_type.clone()).or_insert(0) += 1;
             }
-            
+
             for (block_type, count) in &block_types {
                 println!("  - {}: {}", block_type, count);
             }
-            
+
             println!("\n========================================");
             println!("Full JSON Output:");
             println!("========================================\n");
-            
+
             match serde_json::to_string_pretty(&doc) {
                 Ok(json) => println!("{}", json),
                 Err(e) => eprintln!("Error serializing to JSON: {}", e),

@@ -26,15 +26,20 @@ For more information, visit [The Official Rust Website](https://www.rust-lang.or
     match markdown_to_editorjs(markdown) {
         Ok(blocks) => {
             let doc = EditorJsDocument::new(blocks);
-            
+
             println!("Output Editor.js JSON:");
             println!("{}\n", serde_json::to_string_pretty(&doc).unwrap());
-            
+
             println!("Block Summary:");
             println!("==============");
             for (i, block) in doc.blocks.iter().enumerate() {
-                println!("\nBlock {}: ID={}, Type={}", i + 1, block.id, block.block_type);
-                
+                println!(
+                    "\nBlock {}: ID={}, Type={}",
+                    i + 1,
+                    block.id,
+                    block.block_type
+                );
+
                 match block.block_type.as_str() {
                     "heading" => {
                         if let serde_json::Value::Object(data) = &block.data {
@@ -53,7 +58,9 @@ For more information, visit [The Official Rust Website](https://www.rust-lang.or
                                 if text_str.contains("<a") {
                                     println!("  Contains links: YES");
                                     // Extract link info
-                                    let re = regex::Regex::new(r#"href="([^"]+)"[^>]*>([^<]+)</a>"#).unwrap();
+                                    let re =
+                                        regex::Regex::new(r#"href="([^"]+)"[^>]*>([^<]+)</a>"#)
+                                            .unwrap();
                                     for cap in re.captures_iter(text_str) {
                                         println!("    - Link: {} -> {}", &cap[2], &cap[1]);
                                     }

@@ -106,24 +106,24 @@ impl MarkdownParser {
 
     fn is_list_start(&self, line: &str) -> bool {
         let trimmed = line.trim_start();
-        
+
         // Unordered list: -, +, *
         if trimmed.starts_with("- ") || trimmed.starts_with("+ ") || trimmed.starts_with("* ") {
             return true;
         }
-        
+
         // Ordered list: 1. 2. etc
         if let Some(dot_pos) = trimmed.find(". ") {
             if trimmed[..dot_pos].chars().all(|c| c.is_numeric()) {
                 return true;
             }
         }
-        
+
         // Checklist: - [ ] or - [x]
         if trimmed.starts_with("- [") || trimmed.starts_with("+ [") || trimmed.starts_with("* [") {
             return true;
         }
-        
+
         false
     }
 
@@ -134,7 +134,7 @@ impl MarkdownParser {
     fn parse_list(&self, start: usize) -> (EditorJsBlock, usize) {
         let first_line = &self.lines[start];
         let trimmed = first_line.trim_start();
-        
+
         let style = if self.is_checklist_item(trimmed) {
             "checklist"
         } else if self.is_ordered_list_item(trimmed) {
@@ -144,7 +144,7 @@ impl MarkdownParser {
         };
 
         let (items, next_i) = self.parse_list_items(start, style);
-        
+
         let data = if style == "ordered" {
             ListData {
                 style: "ordered".to_string(),
@@ -185,7 +185,7 @@ impl MarkdownParser {
 
         while i < self.lines.len() {
             let line = &self.lines[i];
-            
+
             if line.is_empty() {
                 i += 1;
                 continue;
@@ -260,15 +260,12 @@ impl MarkdownParser {
     }
 
     fn parse_unordered_list_item(&self, line: &str) -> String {
-        if line.starts_with("- ") {
-            line[2..].trim().to_string()
-        } else if line.starts_with("+ ") {
-            line[2..].trim().to_string()
-        } else if line.starts_with("* ") {
-            line[2..].trim().to_string()
-        } else {
-            line.to_string()
+        for prefix in &["-", "+", "*"] {
+            if let Some(stripped) = line.strip_prefix(&format!("{} ", prefix)) {
+                return stripped.trim().to_string();
+            }
         }
+        line.to_string()
     }
 
     fn parse_ordered_list_item(&self, line: &str) -> String {
@@ -304,12 +301,13 @@ impl MarkdownParser {
 
     fn extract_heading_text(&self, line: &str, level: u8) -> String {
         let prefix = format!("{} ", "#".repeat(level as usize));
-        let mut text = line.trim_start()
+        let mut text = line
+            .trim_start()
             .strip_prefix(&prefix)
             .unwrap_or(line)
             .trim()
             .to_string();
-        
+
         text = self.convert_inline_formatting(&text);
         text = self.convert_markdown_links(&text);
         text
@@ -374,7 +372,10 @@ impl MarkdownParser {
         let re = Regex::new(r#"!\[([^\]]*)\]\(([^)\s]+)(?:\s+['\"]([^'\"]*)['\"])?\)"#).unwrap();
         if let Some(cap) = re.captures(line) {
             let alt_text = cap.get(1).map(|m| m.as_str().to_string());
-            let url = cap.get(2).map(|m| m.as_str().to_string()).unwrap_or_default();
+            let url = cap
+                .get(2)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
             let title = cap.get(3).map(|m| m.as_str().to_string());
 
             let caption = title.or(alt_text);
@@ -382,7 +383,7 @@ impl MarkdownParser {
             return Some(EditorJsBlock::Image {
                 data: ImageData {
                     url,
-                    caption: if caption.as_ref().map_or(true, |c| c.is_empty()) {
+                    caption: if caption.as_ref().is_none_or(|c| c.is_empty()) {
                         None
                     } else {
                         caption
@@ -445,8 +446,7 @@ impl MarkdownParser {
             .filter(|cell| !cell.trim().is_empty())
             .all(|cell| {
                 let trimmed = cell.trim();
-                trimmed.chars().all(|c| c == '-' || c == ':' || c == ' ')
-                    && trimmed.contains('-')
+                trimmed.chars().all(|c| c == '-' || c == ':' || c == ' ') && trimmed.contains('-')
             })
     }
 
@@ -471,31 +471,25 @@ impl MarkdownParser {
         let mut text = lines.join(" ");
         text = self.convert_inline_formatting(&text);
         text = self.convert_markdown_links(&text);
-        
+
         (text, i)
     }
 
     fn convert_inline_formatting(&self, text: &str) -> String {
         let mut result = text.to_string();
-        
+
         // Convert strikethrough: ~~text~~ -> <s>text</s>
         let strikethrough = Regex::new(r"~~([^~]+)~~").unwrap();
-        result = strikethrough
-            .replace_all(&result, "<s>$1</s>")
-            .into_owned();
-        
+        result = strikethrough.replace_all(&result, "<s>$1</s>").into_owned();
+
         // Convert bold: **text** -> <b>text</b>
         let bold = Regex::new(r"\*\*([^\*]+)\*\*").unwrap();
-        result = bold
-            .replace_all(&result, "<b>$1</b>")
-            .into_owned();
-        
+        result = bold.replace_all(&result, "<b>$1</b>").into_owned();
+
         // Convert italic: _text_ -> <i>text</i> (but not in links or bold)
         let italic = Regex::new(r"_([^_]+)_").unwrap();
-        result = italic
-            .replace_all(&result, "<i>$1</i>")
-            .into_owned();
-        
+        result = italic.replace_all(&result, "<i>$1</i>").into_owned();
+
         result
     }
 
@@ -513,8 +507,7 @@ impl MarkdownParser {
 
     fn is_horizontal_rule(&self, line: &str) -> bool {
         let trimmed = line.trim();
-        (trimmed == "---" || trimmed == "***" || trimmed == "___")
-            && trimmed.len() >= 3
+        (trimmed == "---" || trimmed == "***" || trimmed == "___") && trimmed.len() >= 3
     }
 }
 
@@ -527,7 +520,7 @@ mod tests {
         let md = "- Item 1\n- Item 2\n- Item 3";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::List { data } = &blocks[0] {
             assert_eq!(data.style, "unordered");
             assert_eq!(data.items.len(), 3);
@@ -541,7 +534,7 @@ mod tests {
         let md = "1. Item 1\n2. Item 2\n3. Item 3";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::List { data } = &blocks[0] {
             assert_eq!(data.style, "ordered");
             assert_eq!(data.items.len(), 3);
@@ -555,7 +548,7 @@ mod tests {
         let md = "- Item 1\n- Item 2\n    - Nested 1\n    - Nested 2\n- Item 3";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::List { data } = &blocks[0] {
             assert_eq!(data.style, "unordered");
             assert_eq!(data.items.len(), 3);
@@ -571,7 +564,7 @@ mod tests {
         let md = "1. Item 1\n2. Item 2\n    1. Nested 1\n    2. Nested 2\n3. Item 3";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::List { data } = &blocks[0] {
             assert_eq!(data.style, "ordered");
             assert_eq!(data.items.len(), 3);
@@ -586,7 +579,7 @@ mod tests {
         let md = "- [ ] Unchecked\n- [x] Checked\n- [ ] Unchecked 2";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::List { data } = &blocks[0] {
             assert_eq!(data.style, "checklist");
             assert_eq!(data.items.len(), 3);
@@ -602,7 +595,7 @@ mod tests {
         let md = "- **Bold** item\n- _Italic_ item\n- ~~Strikethrough~~ item";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::List { data } = &blocks[0] {
             assert!(data.items[0].content.contains("<b>Bold</b>"));
             assert!(data.items[1].content.contains("<i>Italic</i>"));
@@ -617,10 +610,14 @@ mod tests {
         let md = "- [Link 1](https://example.com)\n- [Link 2](https://example.com)";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::List { data } = &blocks[0] {
-            assert!(data.items[0].content.contains(r#"<a href="https://example.com" target="_blank">Link 1</a>"#));
-            assert!(data.items[1].content.contains(r#"<a href="https://example.com" target="_blank">Link 2</a>"#));
+            assert!(data.items[0]
+                .content
+                .contains(r#"<a href="https://example.com" target="_blank">Link 1</a>"#));
+            assert!(data.items[1]
+                .content
+                .contains(r#"<a href="https://example.com" target="_blank">Link 2</a>"#));
         } else {
             panic!("Expected list block");
         }
@@ -645,9 +642,11 @@ mod tests {
         let md = "This is a [link to Google](https://google.com) in a paragraph.";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Paragraph { data } = &blocks[0] {
-            assert!(data.text.contains(r#"<a href="https://google.com" target="_blank">link to Google</a>"#));
+            assert!(data
+                .text
+                .contains(r#"<a href="https://google.com" target="_blank">link to Google</a>"#));
         } else {
             panic!("Expected paragraph block");
         }
@@ -655,13 +654,18 @@ mod tests {
 
     #[test]
     fn test_markdown_multiple_links() {
-        let md = "Check [GitHub](https://github.com) and [Stack Overflow](https://stackoverflow.com).";
+        let md =
+            "Check [GitHub](https://github.com) and [Stack Overflow](https://stackoverflow.com).";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Paragraph { data } = &blocks[0] {
-            assert!(data.text.contains(r#"<a href="https://github.com" target="_blank">GitHub</a>"#));
-            assert!(data.text.contains(r#"<a href="https://stackoverflow.com" target="_blank">Stack Overflow</a>"#));
+            assert!(data
+                .text
+                .contains(r#"<a href="https://github.com" target="_blank">GitHub</a>"#));
+            assert!(data.text.contains(
+                r#"<a href="https://stackoverflow.com" target="_blank">Stack Overflow</a>"#
+            ));
         } else {
             panic!("Expected paragraph block");
         }
@@ -672,9 +676,11 @@ mod tests {
         let md = "# Visit [our site](https://example.com)";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Heading { data } = &blocks[0] {
-            assert!(data.text.contains(r#"<a href="https://example.com" target="_blank">our site</a>"#));
+            assert!(data
+                .text
+                .contains(r#"<a href="https://example.com" target="_blank">our site</a>"#));
             assert_eq!(data.level, 1);
         } else {
             panic!("Expected heading block");
@@ -686,11 +692,15 @@ mod tests {
         let md = "- Learn [Rust](https://www.rust-lang.org/)\n- Read [The Book](https://doc.rust-lang.org/book/)";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::List { data } = &blocks[0] {
             assert_eq!(data.items.len(), 2);
-            assert!(data.items[0].contains(r#"<a href="https://www.rust-lang.org/" target="_blank">Rust</a>"#));
-            assert!(data.items[1].contains(r#"<a href="https://doc.rust-lang.org/book/" target="_blank">The Book</a>"#));
+            assert!(data.items[0]
+                .content
+                .contains(r#"<a href="https://www.rust-lang.org/" target="_blank">Rust</a>"#));
+            assert!(data.items[1].content.contains(
+                r#"<a href="https://doc.rust-lang.org/book/" target="_blank">The Book</a>"#
+            ));
         } else {
             panic!("Expected list block");
         }
@@ -701,9 +711,11 @@ mod tests {
         let md = "> Check [our blog](https://blog.example.com) for updates.";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Quote { data } = &blocks[0] {
-            assert!(data.text.contains(r#"<a href="https://blog.example.com" target="_blank">our blog</a>"#));
+            assert!(data
+                .text
+                .contains(r#"<a href="https://blog.example.com" target="_blank">our blog</a>"#));
         } else {
             panic!("Expected quote block");
         }
@@ -714,9 +726,11 @@ mod tests {
         let md = "Visit [API docs](https://example.com/api?param=value&other=123)";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Paragraph { data } = &blocks[0] {
-            assert!(data.text.contains(r#"https://example.com/api?param=value&other=123"#));
+            assert!(data
+                .text
+                .contains(r#"https://example.com/api?param=value&other=123"#));
             assert!(data.text.contains(r#"target="_blank""#));
         } else {
             panic!("Expected paragraph block");
@@ -728,7 +742,7 @@ mod tests {
         let md = "Jump to [section](https://example.com#section1)";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Paragraph { data } = &blocks[0] {
             assert!(data.text.contains(r#"https://example.com#section1"#));
         } else {
@@ -742,7 +756,7 @@ mod tests {
         let md = "This is **bold text** in a paragraph.";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Paragraph { data } = &blocks[0] {
             assert!(data.text.contains("<b>bold text</b>"));
         } else {
@@ -755,7 +769,7 @@ mod tests {
         let md = "This is _italic text_ in a paragraph.";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Paragraph { data } = &blocks[0] {
             assert!(data.text.contains("<i>italic text</i>"));
         } else {
@@ -768,7 +782,7 @@ mod tests {
         let md = "This is ~~strikethrough text~~ in a paragraph.";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Paragraph { data } = &blocks[0] {
             assert!(data.text.contains("<s>strikethrough text</s>"));
         } else {
@@ -781,7 +795,7 @@ mod tests {
         let md = "This is **bold**, _italic_, and ~~strikethrough~~ together.";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Paragraph { data } = &blocks[0] {
             assert!(data.text.contains("<b>bold</b>"));
             assert!(data.text.contains("<i>italic</i>"));
@@ -796,7 +810,7 @@ mod tests {
         let md = "# **Bold** and _italic_ heading";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Heading { data } = &blocks[0] {
             assert!(data.text.contains("<b>Bold</b>"));
             assert!(data.text.contains("<i>italic</i>"));
@@ -811,12 +825,12 @@ mod tests {
         let md = "- Item with **bold**\n- Item with _italic_\n- Item with ~~strikethrough~~";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::List { data } = &blocks[0] {
             assert_eq!(data.items.len(), 3);
-            assert!(data.items[0].contains("<b>bold</b>"));
-            assert!(data.items[1].contains("<i>italic</i>"));
-            assert!(data.items[2].contains("<s>strikethrough</s>"));
+            assert!(data.items[0].content.contains("<b>bold</b>"));
+            assert!(data.items[1].content.contains("<i>italic</i>"));
+            assert!(data.items[2].content.contains("<s>strikethrough</s>"));
         } else {
             panic!("Expected list block");
         }
@@ -827,7 +841,7 @@ mod tests {
         let md = "> This quote has **bold** and _italic_ text.";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Quote { data } = &blocks[0] {
             assert!(data.text.contains("<b>bold</b>"));
             assert!(data.text.contains("<i>italic</i>"));
@@ -841,7 +855,7 @@ mod tests {
         let md = "This has **[bold link](https://example.com)** and _[italic link](https://example.com)_.";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Paragraph { data } = &blocks[0] {
             // The formatting converts before links, so we get a link wrapped in bold tags
             assert!(data.text.contains("https://example.com"));
@@ -856,7 +870,7 @@ mod tests {
         let md = "This is **bold with _nested italic_** inside.";
         let blocks = markdown_to_editorjs(md).unwrap();
         assert_eq!(blocks.len(), 1);
-        
+
         if let EditorJsBlock::Paragraph { data } = &blocks[0] {
             // After formatting conversion, we expect both tags applied
             assert!(data.text.contains("<b>"));
