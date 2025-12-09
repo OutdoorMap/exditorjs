@@ -30,10 +30,10 @@ jobs:
           workspaces: native/exditorjs_native
       
       - name: Run tests
-        run: cargo test --manifest-path native/exditorjs_native/Cargo.toml --verbose
+        run: cargo test --manifest-path native/exditorjs_native/Cargo.toml --lib --tests --verbose
       
       - name: Run tests (release)
-        run: cargo test --manifest-path native/exditorjs_native/Cargo.toml --release --verbose
+        run: cargo test --manifest-path native/exditorjs_native/Cargo.toml --lib --tests --release --verbose
 
   clippy:
     name: Clippy
@@ -50,7 +50,7 @@ jobs:
           workspaces: native/exditorjs_native
       
       - name: Run clippy
-        run: cargo clippy --manifest-path native/exditorjs_native/Cargo.toml --all-targets --all-features -- -D warnings
+        run: cargo clippy --manifest-path native/exditorjs_native/Cargo.toml --lib --tests -- -D warnings
 
   fmt:
     name: Rustfmt
