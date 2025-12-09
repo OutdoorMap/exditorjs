@@ -1,5 +1,4 @@
-use serde_json::{json, Value};
-use std::collections::BTreeMap;
+
 
 /// Generates a unique ID for blocks
 pub fn generate_block_id() -> String {
@@ -128,8 +127,8 @@ pub struct HeadingData {
 pub struct ListMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub counterType: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "counterType")]
+    pub counter_type: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Default)]
@@ -158,10 +157,10 @@ pub struct ImageData {
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caption: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub withBorder: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub withBackground: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "withBorder")]
+    pub with_border: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "withBackground")]
+    pub with_background: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stretched: Option<bool>,
 }

@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::models::*;
 use regex::Regex;
 
@@ -9,6 +9,7 @@ pub fn markdown_to_editorjs(markdown: &str) -> Result<Vec<EditorJsBlock>> {
 }
 
 struct MarkdownParser {
+    #[allow(dead_code)]
     markdown: String,
     lines: Vec<String>,
 }
@@ -150,7 +151,7 @@ impl MarkdownParser {
                 items,
                 meta: Some(ListMeta {
                     start: Some(1),
-                    counterType: None,
+                    counter_type: None,
                 }),
             }
         } else {
@@ -386,8 +387,8 @@ impl MarkdownParser {
                     } else {
                         caption
                     },
-                    withBorder: None,
-                    withBackground: None,
+                    with_border: None,
+                    with_background: None,
                     stretched: None,
                 },
             });

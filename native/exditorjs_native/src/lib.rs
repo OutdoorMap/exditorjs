@@ -62,7 +62,7 @@ mod atoms {
 
 // NIF function to convert HTML to EditorJS
 #[rustler::nif(schedule = "DirtyCpu")]
-fn html_to_editorjs_nif(env: rustler::Env, html: String) -> NifResult<rustler::Term<'_>> {
+fn html_to_editorjs_nif(env: rustler::Env<'_>, html: String) -> NifResult<rustler::Term<'_>> {
     match html_to_editorjs(&html) {
         Ok(blocks) => {
             let document = EditorJsDocument::new(blocks);
@@ -77,7 +77,7 @@ fn html_to_editorjs_nif(env: rustler::Env, html: String) -> NifResult<rustler::T
 
 // NIF function to convert Markdown to EditorJS
 #[rustler::nif(schedule = "DirtyCpu")]
-fn markdown_to_editorjs_nif(env: rustler::Env, markdown: String) -> NifResult<rustler::Term<'_>> {
+fn markdown_to_editorjs_nif(env: rustler::Env<'_>, markdown: String) -> NifResult<rustler::Term<'_>> {
     match markdown_to_editorjs(&markdown) {
         Ok(blocks) => {
             let document = EditorJsDocument::new(blocks);
@@ -90,7 +90,4 @@ fn markdown_to_editorjs_nif(env: rustler::Env, markdown: String) -> NifResult<ru
     }
 }
 
-rustler::init!(
-    "Elixir.ExditorJS",
-    [html_to_editorjs_nif, markdown_to_editorjs_nif]
-);
+rustler::init!("Elixir.ExditorJS");

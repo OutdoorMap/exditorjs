@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::models::*;
 use regex::Regex;
 
@@ -38,7 +38,7 @@ impl HtmlParser {
             if html.chars().nth(pos).map_or(false, |c| c == '<') {
                 // Find the end of the tag
                 if let Some(tag_end) = html[pos..].find('>') {
-                    let tag_full = &html[pos..pos + tag_end + 1];
+                    let _tag_full = &html[pos..pos + tag_end + 1];
                     
                     // Parse the tag
                     if let Some(block) = self.parse_element(&html, &mut pos) {
@@ -211,7 +211,7 @@ impl HtmlParser {
                 items,
                 meta: Some(ListMeta {
                     start: Some(1),
-                    counterType: None,
+                    counter_type: None,
                 }),
             }
         } else {
@@ -299,8 +299,8 @@ impl HtmlParser {
             data: ImageData {
                 url,
                 caption,
-                withBorder: None,
-                withBackground: None,
+                with_border: None,
+                with_background: None,
                 stretched: None,
             },
         }))
