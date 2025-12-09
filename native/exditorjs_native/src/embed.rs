@@ -131,7 +131,12 @@ pub fn detect_embed_service(url: &str) -> Option<(String, String, u32, u32)> {
 
             if !id.is_empty() {
                 let embed_url = service.embed_url_template.replace("{}", &id);
-                return Some((service.name.to_string(), embed_url, service.width, service.height));
+                return Some((
+                    service.name.to_string(),
+                    embed_url,
+                    service.width,
+                    service.height,
+                ));
             }
         }
     }

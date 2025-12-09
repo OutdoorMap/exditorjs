@@ -1,6 +1,6 @@
+use crate::embed::{detect_embed_service, detect_service_from_src, parse_iframe};
 use crate::error::Result;
 use crate::models::*;
-use crate::embed::{detect_embed_service, detect_service_from_src, parse_iframe};
 use regex::Regex;
 
 /// Convert HTML to Editor.js blocks
@@ -177,12 +177,12 @@ impl HtmlParser {
             }
             "p" | "div" | "span" => {
                 let text = self.clean_html(content);
-                
+
                 // Check if the paragraph contains an embed link
                 if let Some(block) = self.parse_embed_from_paragraph(content) {
                     return Ok(Some(block));
                 }
-                
+
                 if !text.is_empty() {
                     Ok(Some(EditorJsBlock::Paragraph {
                         data: ParagraphData { text },
@@ -384,11 +384,11 @@ impl HtmlParser {
     fn parse_embed_from_paragraph(&self, content: &str) -> Option<EditorJsBlock> {
         // Extract URLs from links in the paragraph
         let url_re = Regex::new(r#"(?:href=["']?)?https?://[^\s"'<>]+"#).ok()?;
-        
+
         for caps in url_re.captures_iter(content) {
             let url_match = caps.get(0)?;
             let url = url_match.as_str().trim_matches('"').trim_matches('\'');
-            
+
             // Try to detect if this is an embed service
             if let Some((service, embed_url, width, height)) = detect_embed_service(url) {
                 return Some(EditorJsBlock::Embed {
