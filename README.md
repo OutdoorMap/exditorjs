@@ -72,6 +72,40 @@ Returns
  }}
 ```
 
+## Supported Data Structure
+
+### Image Block
+
+Image blocks support the following fields:
+
+- `url` (required): The image URL
+- `caption` (optional): Image caption text
+- `with_border` (optional, boolean): Display image with border (formerly `withBorder`)
+- `with_background` (optional, boolean): Display image with background (formerly `withBackground`)
+- `stretched` (optional, boolean): Stretch image to full width
+
+### List Block
+
+List blocks support the following fields:
+
+- `style` (required): List style - `"ordered"` or `"unordered"`
+- `items` (required): Array of list items
+- `meta` (optional): List metadata
+  - `start` (optional): Starting number for ordered lists
+  - `counter_type` (optional): Counter type for ordered lists (formerly `counterType`)
+
+## Migration Notes
+
+As of recent updates, the following attribute names have been changed to follow Rust naming conventions (snake_case):
+
+| Old Name | New Name |
+|----------|----------|
+| `withBorder` | `with_border` |
+| `withBackground` | `with_background` |
+| `counterType` | `counter_type` |
+
+For backward compatibility with existing JSON data, the library supports deserialization using both old and new field names via serde aliases. This means existing code that uses the old names will continue to work when parsing JSON responses.
+
 ## Contributing
 
 1. Fork the repository.
