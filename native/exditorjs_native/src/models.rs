@@ -127,7 +127,7 @@ pub struct HeadingData {
 pub struct ListMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "counterType")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "counterType", rename = "counterType")]
     pub counter_type: Option<String>,
 }
 
@@ -157,9 +157,9 @@ pub struct ImageData {
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caption: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "withBorder")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "withBorder", rename = "withBorder")]
     pub with_border: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "withBackground")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "withBackground", rename = "withBackground")]
     pub with_background: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stretched: Option<bool>,
