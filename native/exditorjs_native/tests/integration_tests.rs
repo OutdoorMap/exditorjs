@@ -64,7 +64,7 @@ mod tests {
     fn test_html_mixed_content() {
         let html = r#"<h1>Title</h1><p>Paragraph</p><ul><li>Item</li></ul>"#;
         let blocks = html_to_editorjs(html).unwrap();
-        assert!(blocks.len() > 0);
+        assert!(!blocks.is_empty());
     }
 
     #[test]
@@ -127,7 +127,7 @@ mod tests {
     fn test_markdown_horizontal_rule() {
         let md = "Above\n\n---\n\nBelow";
         let blocks = markdown_to_editorjs(md).unwrap();
-        assert!(blocks.len() > 0);
+        assert!(!blocks.is_empty());
     }
 
     #[test]
@@ -145,7 +145,7 @@ console.log("hello");
 ```
         "#;
         let blocks = markdown_to_editorjs(md).unwrap();
-        assert!(blocks.len() > 0);
+        assert!(!blocks.is_empty());
     }
 
     #[test]
@@ -164,13 +164,13 @@ console.log("hello");
     fn test_html_entities_decoding() {
         let html = "<p>&lt;html&gt; &amp; &quot;quoted&quot;</p>";
         let blocks = html_to_editorjs(html).unwrap();
-        assert!(blocks.len() > 0);
+        assert!(!blocks.is_empty());
     }
 
     #[test]
     fn test_markdown_table() {
         let md = "| Header 1 | Header 2 |\n|----------|----------|\n| Cell 1 | Cell 2 |";
         let blocks = markdown_to_editorjs(md).unwrap();
-        assert!(blocks.len() > 0);
+        assert!(!blocks.is_empty());
     }
 }

@@ -24,11 +24,11 @@ pub mod html;
 pub mod markdown;
 pub mod models;
 
-use rustler::{NifResult, Encoder};
 pub use error::{Error, Result};
 pub use html::html_to_editorjs;
 pub use markdown::markdown_to_editorjs;
 pub use models::{EditorJsBlock, EditorJsBlockWithId};
+use rustler::{Encoder, NifResult};
 
 /// Represents an Editor.js document with proper structure
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -62,35 +62,43 @@ mod atoms {
 
 // NIF function to convert HTML to EditorJS
 #[rustler::nif(schedule = "DirtyCpu")]
-fn html_to_editorjs_nif(env: rustler::Env, html: String) -> NifResult<rustler::Term<'_>> {
+fn html_to_editorjs_nif(env: rustler::Env<'_>, html: String) -> NifResult<rustler::Term<'_>> {
     match html_to_editorjs(&html) {
         Ok(blocks) => {
             let document = EditorJsDocument::new(blocks);
             match serde_json::to_string(&document) {
                 Ok(json) => Ok((atoms::ok(), json).encode(env)),
-                Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new("json_encode_error"))),
+                Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new(
+                    "json_encode_error",
+                ))),
             }
         }
-        Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new("conversion_error"))),
+        Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new(
+            "conversion_error",
+        ))),
     }
 }
 
 // NIF function to convert Markdown to EditorJS
 #[rustler::nif(schedule = "DirtyCpu")]
-fn markdown_to_editorjs_nif(env: rustler::Env, markdown: String) -> NifResult<rustler::Term<'_>> {
+fn markdown_to_editorjs_nif(
+    env: rustler::Env<'_>,
+    markdown: String,
+) -> NifResult<rustler::Term<'_>> {
     match markdown_to_editorjs(&markdown) {
         Ok(blocks) => {
             let document = EditorJsDocument::new(blocks);
             match serde_json::to_string(&document) {
                 Ok(json) => Ok((atoms::ok(), json).encode(env)),
-                Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new("json_encode_error"))),
+                Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new(
+                    "json_encode_error",
+                ))),
             }
         }
-        Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new("conversion_error"))),
+        Err(_) => Err(rustler::error::Error::RaiseTerm(Box::new(
+            "conversion_error",
+        ))),
     }
 }
 
-rustler::init!(
-    "Elixir.ExditorJS",
-    [html_to_editorjs_nif, markdown_to_editorjs_nif]
-);
+rustler::init!("Elixir.ExditorJS");

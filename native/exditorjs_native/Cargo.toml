@@ -14,13 +14,10 @@ thiserror = "2.0"
 [lib]
 name = "exditorjs_native"
 path = "src/lib.rs"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["nif_version_2_15"]
 nif_version_2_15 = ["rustler/nif_version_2_15"]
 nif_version_2_16 = ["rustler/nif_version_2_16"]
 nif_version_2_17 = ["rustler/nif_version_2_17"]
-
-[build.env]
-passthrough = ["RUST_MIN_STACK"]
