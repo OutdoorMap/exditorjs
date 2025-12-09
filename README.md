@@ -4,12 +4,12 @@ This Elixir library provides functionality to convert Markdown and HTML into Edi
 
 ## Installation
 
-To use the `exditorjs_native` library in your Elixir project, add it to your `mix.exs` dependencies:
+To use the `exditorjs` library in your Elixir project, add it to your `mix.exs` dependencies:
 
 ```elixir
 defp deps do
   [
-    {:exditorjs_native, git: "https://github.com/OutdoorMap/exditorjs.git"}
+    {:exditorjs, git: "https://github.com/OutdoorMap/exditorjs.git"}
   ]
 end
 ```
