@@ -1,3 +1,4 @@
+use crate::embed::{detect_embed_service, detect_service_from_src, parse_iframe};
 use crate::error::Result;
 use crate::models::*;
 use regex::Regex;
@@ -100,6 +101,7 @@ impl HtmlParser {
         // Self-closing or void tags
         if tag_content.ends_with('/')
             || tag_content.starts_with("img ")
+            || tag_content.starts_with("iframe ")
             || tag_content.starts_with("br")
             || tag_content.starts_with("hr")
         {
@@ -107,6 +109,10 @@ impl HtmlParser {
 
             if tag_content.starts_with("img") {
                 if let Ok(Some(block)) = self.parse_image(tag_content) {
+                    return Some(block);
+                }
+            } else if tag_content.starts_with("iframe") {
+                if let Some(block) = self.parse_iframe_tag(tag_content) {
                     return Some(block);
                 }
             } else if tag_content.starts_with("hr") {
@@ -127,6 +133,17 @@ impl HtmlParser {
         } else {
             ""
         };
+
+        // Check for iframe with closing tag
+        if tag_name.eq_ignore_ascii_case("iframe") {
+            if let Some(block) = self.parse_iframe_tag(tag_content) {
+                let closing_tag = "</iframe>";
+                if let Some(closing_pos) = html[tag_start + tag_end + 1..].find(closing_tag) {
+                    *pos = tag_start + tag_end + 1 + closing_pos + closing_tag.len();
+                }
+                return Some(block);
+            }
+        }
 
         // Find closing tag
         let closing_tag = format!("</{}>", tag_name);
@@ -160,6 +177,12 @@ impl HtmlParser {
             }
             "p" | "div" | "span" => {
                 let text = self.clean_html(content);
+
+                // Check if the paragraph contains an embed link
+                if let Some(block) = self.parse_embed_from_paragraph(content) {
+                    return Ok(Some(block));
+                }
+
                 if !text.is_empty() {
                     Ok(Some(EditorJsBlock::Paragraph {
                         data: ParagraphData { text },
@@ -337,6 +360,50 @@ impl HtmlParser {
         re.captures(attrs)
             .and_then(|cap| cap.get(1))
             .map(|m| m.as_str().to_string())
+    }
+
+    fn parse_iframe_tag(&self, attrs: &str) -> Option<EditorJsBlock> {
+        if let Some((src, width, height)) = parse_iframe(attrs) {
+            // Try to detect the service from the src URL
+            if let Some(service) = detect_service_from_src(&src) {
+                return Some(EditorJsBlock::Embed {
+                    data: EmbedData {
+                        service,
+                        source: src.clone(),
+                        embed: src,
+                        width,
+                        height,
+                        caption: None,
+                    },
+                });
+            }
+        }
+        None
+    }
+
+    fn parse_embed_from_paragraph(&self, content: &str) -> Option<EditorJsBlock> {
+        // Extract URLs from links in the paragraph
+        let url_re = Regex::new(r#"(?:href=["']?)?https?://[^\s"'<>]+"#).ok()?;
+
+        for caps in url_re.captures_iter(content) {
+            let url_match = caps.get(0)?;
+            let url = url_match.as_str().trim_matches('"').trim_matches('\'');
+
+            // Try to detect if this is an embed service
+            if let Some((service, embed_url, width, height)) = detect_embed_service(url) {
+                return Some(EditorJsBlock::Embed {
+                    data: EmbedData {
+                        service,
+                        source: url.to_string(),
+                        embed: embed_url,
+                        width,
+                        height,
+                        caption: None,
+                    },
+                });
+            }
+        }
+        None
     }
 
     fn clean_html(&self, text: &str) -> String {
