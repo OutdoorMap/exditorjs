@@ -217,6 +217,214 @@ defmodule ExditorJSTest do
       assert is_list(document["blocks"])
       assert document["version"] == "2.25.0"
     end
+
+    test "markdown with UTF-8 in headings" do
+      markdown = "# Upptäck Dalsland från cykelsadeln"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      heading_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "heading" end)
+      assert length(heading_blocks) > 0
+      
+      heading = Enum.at(heading_blocks, 0)
+      assert heading["data"]["level"] == 1
+      assert heading["data"]["text"] == "Upptäck Dalsland från cykelsadeln"
+    end
+
+    test "markdown with UTF-8 in paragraphs" do
+      markdown = "Cykeln är det perfekta redskapet för att upptäcka Dalsland."
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      paragraph_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "paragraph" end)
+      assert length(paragraph_blocks) > 0
+      
+      paragraph = Enum.at(paragraph_blocks, 0)
+      assert String.contains?(paragraph["data"]["text"], "Dalsland")
+    end
+
+    test "markdown with UTF-8 in unordered lists" do
+      markdown = """
+      - Cykelpaket för äventyrare
+      - Guidat cykeltur i Dalsland
+      - Sevärdheter och aktiviteter
+      """
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      list_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "list" end)
+      assert length(list_blocks) > 0
+      
+      list = Enum.at(list_blocks, 0)
+      assert list["data"]["style"] == "unordered"
+      assert length(list["data"]["items"]) == 3
+      assert Enum.at(list["data"]["items"], 0)["content"] == "Cykelpaket för äventyrare"
+      assert Enum.at(list["data"]["items"], 1)["content"] == "Guidat cykeltur i Dalsland"
+    end
+
+    test "markdown with UTF-8 in ordered lists" do
+      markdown = """
+      1. Cykelpaket för äventyrare
+      2. Guidat cykeltur i Dalsland
+      """
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      list_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "list" end)
+      assert length(list_blocks) > 0
+      
+      list = Enum.at(list_blocks, 0)
+      assert list["data"]["style"] == "ordered"
+      assert length(list["data"]["items"]) == 2
+    end
+
+    test "markdown with UTF-8 in blockquotes" do
+      markdown = """
+      > Cykeln är det perfekta redskapet för att upptäcka Dalsland
+      > och älska naturen omkring dig.
+      """
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      quote_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "quote" end)
+      assert length(quote_blocks) > 0
+      
+      quote = Enum.at(quote_blocks, 0)
+      assert String.contains?(quote["data"]["text"], "perfekta")
+      assert String.contains?(quote["data"]["text"], "Dalsland")
+    end
+
+    test "markdown with UTF-8 in code blocks" do
+      markdown = """
+      ```rust
+      // Här är en kommentar
+      fn test() {}
+      ```
+      """
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      code_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "code" end)
+      assert length(code_blocks) > 0
+      
+      code = Enum.at(code_blocks, 0)
+      assert code["data"]["language"] == "rust"
+      assert String.contains?(code["data"]["code"], "kommentar")
+    end
+
+    test "markdown with Japanese in headings" do
+      markdown = "# ダルスランドを自転車で探検"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      heading_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "heading" end)
+      assert length(heading_blocks) > 0
+      
+      heading = Enum.at(heading_blocks, 0)
+      assert heading["data"]["level"] == 1
+      assert heading["data"]["text"] == "ダルスランドを自転車で探検"
+    end
+
+    test "markdown with Japanese in paragraphs" do
+      markdown = "自転車はダルスランドを探検するのに最適なツールです。"
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      assert is_list(document["blocks"])
+      paragraph_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "paragraph" end)
+      assert length(paragraph_blocks) > 0
+      
+      paragraph = Enum.at(paragraph_blocks, 0)
+      assert String.contains?(paragraph["data"]["text"], "ダルスランド")
+    end
+
+    test "markdown with Japanese in unordered lists" do
+      markdown = """
+      - サイクリングパッケージ
+      - ガイド付きツアー
+      - レンタル自転車
+      """
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      list_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "list" end)
+      assert length(list_blocks) > 0
+      
+      list = Enum.at(list_blocks, 0)
+      assert list["data"]["style"] == "unordered"
+      assert length(list["data"]["items"]) == 3
+      assert Enum.at(list["data"]["items"], 0)["content"] == "サイクリングパッケージ"
+      assert Enum.at(list["data"]["items"], 1)["content"] == "ガイド付きツアー"
+      assert Enum.at(list["data"]["items"], 2)["content"] == "レンタル自転車"
+    end
+
+    test "markdown with Japanese in ordered lists" do
+      markdown = """
+      1. 高品質なレンタル自転車
+      2. 宿泊施設の手配
+      3. ガイドサービス
+      """
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      list_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "list" end)
+      assert length(list_blocks) > 0
+      
+      list = Enum.at(list_blocks, 0)
+      assert list["data"]["style"] == "ordered"
+      assert length(list["data"]["items"]) == 3
+      assert Enum.at(list["data"]["items"], 0)["content"] == "高品質なレンタル自転車"
+    end
+
+    test "markdown with Japanese in blockquotes" do
+      markdown = """
+      > 自転車はダルスランドを探検するのに最適なツールです。
+      > より深く、より楽しい体験ができます。
+      """
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      quote_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "quote" end)
+      assert length(quote_blocks) > 0
+      
+      quote = Enum.at(quote_blocks, 0)
+      assert String.contains?(quote["data"]["text"], "最適な")
+      assert String.contains?(quote["data"]["text"], "ツール")
+    end
+
+    test "markdown with Japanese in code blocks" do
+      markdown = """
+      ```javascript
+      // これはコメントです
+      function test() {}
+      ```
+      """
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      code_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "code" end)
+      assert length(code_blocks) > 0
+      
+      code = Enum.at(code_blocks, 0)
+      assert code["data"]["language"] == "javascript"
+      assert String.contains?(code["data"]["code"], "コメント")
+    end
+
+    test "markdown with mixed Japanese and ASCII" do
+      markdown = """
+      # ダルスランド探検ガイド 2024
+      
+      このガイドはDalsland Experience提供です。
+      
+      - 初心者向けコース
+      - 中級者向けコース (25km)
+      - 上級者向けコース
+      """
+      {:ok, document} = ExditorJS.markdown_to_editorjs(markdown)
+      
+      block_types = Enum.map(document["blocks"], & &1["type"])
+      assert "heading" in block_types
+      assert "paragraph" in block_types
+      assert "list" in block_types
+      
+      # Verify heading
+      heading = Enum.find(document["blocks"], fn block -> 
+        block["type"] == "heading" && String.contains?(block["data"]["text"], "ダルスランド")
+      end)
+      assert heading != nil
+      assert String.contains?(heading["data"]["text"], "2024")
+    end
   end
 
   describe "embed support" do
@@ -323,6 +531,209 @@ defmodule ExditorJSTest do
       # Non-embed URLs should be treated as paragraphs
       assert is_list(document["blocks"])
       assert !Enum.any?(document["blocks"], fn block -> block["type"] == "embed" end)
+    end
+  end
+
+  describe "complex HTML parsing" do
+    test "parses Swedish cycling content with links and attributes" do
+      html = """
+      <p>Upptäck Dalsland från cykelsadeln</p>
+      <h3>Färdiga cykelpaket och guidade turer</h3>
+      <p>Cykeln är det perfekta redskapet för att upptäcka Dalsland. Tillsammans med en guide från <a href="https://www.thedalslandexperience.com/" rel="nofollow noopener" target="_blank">The Dalsland Experience</a> blir upplevelsen både starkare och roligare.</p>
+      <p>Du kan välja på färdiga cykelpaket med boende, guide och hyrcykel eller guidade cykelupplevelser om du tar med egen cykel. Under sommaren erbjuds både korta turer som passar alla, men också lite längre turer för cyklister med mer trampvana. Upptäck de stigar, vägar och platser du inte visste fanns och få ut mer av din cykelupplevelse i Dalsland. The Dalsland Experience är baserade i Bengtsfors men arbetar över nästan hela Dalsland. Även i södra Värmland, såsom Åmål, Dals Långed, Mellerud, Dals-Ed och Säffle.</p>
+      <p> </p>
+      <h3>Hyrcyklar med kvalitet</h3>
+      <p>Alla hyrcyklar hos The Dalsland Experience är byggda för att fungera bra på blandat underlag - inte minst på Dalslands fina grusvägar. Samtliga cyklar har hydrauliska bromsar av hög kvalitet och högklassiga växelgrupper. Hjälm och pedaler ingår alltid i hyran, men det är såklart valfritt att använda sina egna. De erbjuder också hämtning/lämning av cyklar.</p>
+      <h3>Mer än bara cykel</h3>
+      <p>The Dalsland Experience kan hjälpa dig att skräddarsy upplevelser och aktiviteter runt om i Dalsland. Proffsiga samarbetspartners kan erbjuda spännande utflykter, sevärdheter och aktiviteter som sätter guldkant på er cykelresa.<br>Inget boende? Teamet hjälper dig även med boendealternativ anpassat efter dina förutsättningar och önskemål. Det ska vara lätt och roligt att uppleva The Dalsland Experience!</p>
+      <p> </p>
+      """
+      
+      {:ok, document} = ExditorJS.html_to_editorjs(html)
+      
+      assert is_map(document)
+      assert document["version"] == "2.25.0"
+      assert is_integer(document["time"])
+      assert document["time"] > 0
+      assert is_list(document["blocks"])
+      assert length(document["blocks"]) > 0
+      
+      # Verify we have heading blocks
+      block_types = Enum.map(document["blocks"], & &1["type"])
+      assert "heading" in block_types
+      assert "paragraph" in block_types
+      
+      # Check specific headings
+      heading_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "heading" end)
+      heading_texts = Enum.map(heading_blocks, & &1["data"]["text"])
+      
+      assert Enum.any?(heading_texts, fn text -> String.contains?(text, "Färdiga") end)
+      assert Enum.any?(heading_texts, fn text -> String.contains?(text, "Hyrcyklar") end)
+      assert Enum.any?(heading_texts, fn text -> String.contains?(text, "cykel") end)
+      
+      # Check that link text is preserved (link should be stripped but text remains)
+      paragraph_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "paragraph" end)
+      paragraph_texts = Enum.map(paragraph_blocks, & &1["data"]["text"])
+      
+      assert Enum.any?(paragraph_texts, fn text -> String.contains?(text, "The Dalsland Experience") end)
+      assert Enum.any?(paragraph_texts, fn text -> String.contains?(text, "Dalsland") end)
+    end
+
+    test "handles complex attributes on links" do
+      html = ~s|<p>Visit <a href="https://example.com" rel="nofollow noopener" target="_blank" class="external-link" data-custom="value">our website</a> for more info.</p>|
+      {:ok, document} = ExditorJS.html_to_editorjs(html)
+      
+      assert is_list(document["blocks"])
+      assert Enum.any?(document["blocks"], fn block -> block["type"] == "paragraph" end)
+      
+      paragraph = Enum.find(document["blocks"], fn block -> block["type"] == "paragraph" end)
+      assert paragraph != nil
+      # Link text should be extracted but link itself removed
+      assert String.contains?(paragraph["data"]["text"], "our website")
+      assert String.contains?(paragraph["data"]["text"], "more info")
+    end
+
+    test "parses HTML with multiple paragraphs and whitespace" do
+      html = """
+      <p>First paragraph</p>
+      <p> </p>
+      <p>Second paragraph</p>
+      <p></p>
+      <p>Third paragraph</p>
+      """
+      
+      {:ok, document} = ExditorJS.html_to_editorjs(html)
+      
+      assert is_map(document)
+      assert is_list(document["blocks"])
+      assert length(document["blocks"]) > 0
+      
+      # Should have paragraph blocks (empty paragraphs might be filtered or kept)
+      block_types = Enum.map(document["blocks"], & &1["type"])
+      assert "paragraph" in block_types
+    end
+
+    test "handles mixed content with headings and paragraphs with links" do
+      html = """
+      <h2>Welcome</h2>
+      <p>This is a <strong>bold</strong> paragraph with a <a href="https://example.com">link</a>.</p>
+      <h3>Section</h3>
+      <p>Another paragraph with <em>emphasis</em> and <a href="https://other.com" target="_blank">another link</a>.</p>
+      """
+      
+      {:ok, document} = ExditorJS.html_to_editorjs(html)
+      
+      assert is_map(document)
+      assert document["version"] == "2.25.0"
+      assert is_list(document["blocks"])
+      
+      block_types = Enum.map(document["blocks"], & &1["type"])
+      assert "heading" in block_types
+      assert "paragraph" in block_types
+      
+      # Verify h2 exists
+      h2_blocks = Enum.filter(document["blocks"], fn block -> 
+        block["type"] == "heading" && block["data"]["level"] == 2
+      end)
+      assert length(h2_blocks) > 0
+      assert Enum.at(h2_blocks, 0)["data"]["text"] == "Welcome"
+      
+      # Verify h3 exists
+      h3_blocks = Enum.filter(document["blocks"], fn block -> 
+        block["type"] == "heading" && block["data"]["level"] == 3
+      end)
+      assert length(h3_blocks) > 0
+      assert Enum.at(h3_blocks, 0)["data"]["text"] == "Section"
+    end
+
+    test "parses Japanese content with links and attributes" do
+      html = """
+      <p>ダルスランドを自転車で探検</p>
+      <h3>パッケージ化されたサイクリングパッケージとガイド付きツアー</h3>
+      <p>自転車はダルスランドを探検するのに最適なツールです。<a href="https://www.thedalslandexperience.com/" rel="nofollow noopener" target="_blank">ダルスランド エクスペリエンス</a>のガイドと一緒にサイクリングすれば、より深く、より楽しい体験ができます。</p>
+      <p>宿泊、ガイド、レンタル自転車がセットになったパッケージ化されたサイクリングパッケージ、またはご自身の自転車をお持ち込みの場合はガイド付きサイクリング体験からお選びいただけます。</p>
+      <p> </p>
+      <h3>高品質なレンタル自転車</h3>
+      <p>Dalsland Experience のレンタル自転車はすべて、Dalsland の美しい砂利道をはじめ、さまざまな路面状況に対応できるよう設計されています。</p>
+      <h3>自転車以上の価値</h3>
+      <p>Dalsland Experience では、Dalsland 周辺での体験やアクティビティをお客様に合わせてカスタマイズできます。<br>ご宿泊先がお決まりですか？お客様のご都合やご希望に合わせた宿泊施設のご案内もいたします。</p>
+      """
+      
+      {:ok, document} = ExditorJS.html_to_editorjs(html)
+      
+      assert is_map(document)
+      assert document["version"] == "2.25.0"
+      assert is_integer(document["time"])
+      assert document["time"] > 0
+      assert is_list(document["blocks"])
+      assert length(document["blocks"]) > 0
+      
+      # Verify we have heading blocks
+      block_types = Enum.map(document["blocks"], & &1["type"])
+      assert "heading" in block_types
+      assert "paragraph" in block_types
+      
+      # Check specific headings with Japanese text
+      heading_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "heading" end)
+      heading_texts = Enum.map(heading_blocks, & &1["data"]["text"])
+      
+      assert Enum.any?(heading_texts, fn text -> String.contains?(text, "パッケージ") end)
+      assert Enum.any?(heading_texts, fn text -> String.contains?(text, "高品質") end)
+      assert Enum.any?(heading_texts, fn text -> String.contains?(text, "自転車") end)
+      
+      # Check that Japanese text is preserved
+      paragraph_blocks = Enum.filter(document["blocks"], fn block -> block["type"] == "paragraph" end)
+      paragraph_texts = Enum.map(paragraph_blocks, & &1["data"]["text"])
+      
+      assert Enum.any?(paragraph_texts, fn text -> String.contains?(text, "ダルスランド") end)
+      assert Enum.any?(paragraph_texts, fn text -> String.contains?(text, "エクスペリエンス") end)
+    end
+
+    test "handles Japanese with complex attributes on links" do
+      html = ~s|<p>詳細は<a href="https://example.jp" rel="nofollow noopener" target="_blank" class="external-link" data-custom="value">こちら</a>をご覧ください。</p>|
+      {:ok, document} = ExditorJS.html_to_editorjs(html)
+      
+      assert is_list(document["blocks"])
+      assert Enum.any?(document["blocks"], fn block -> block["type"] == "paragraph" end)
+      
+      paragraph = Enum.find(document["blocks"], fn block -> block["type"] == "paragraph" end)
+      assert paragraph != nil
+      # Link text should be extracted but link itself removed
+      assert String.contains?(paragraph["data"]["text"], "こちら")
+      assert String.contains?(paragraph["data"]["text"], "ご覧ください")
+    end
+
+    test "parses Japanese characters in headings with proper levels" do
+      html = """
+      <h1>第一見出し</h1>
+      <h2>第二見出し</h2>
+      <h3>第三見出し</h3>
+      <h4>第四見出し</h4>
+      """
+      
+      {:ok, document} = ExditorJS.html_to_editorjs(html)
+      
+      assert is_map(document)
+      assert is_list(document["blocks"])
+      
+      # Verify all heading levels
+      h1_blocks = Enum.filter(document["blocks"], fn block -> 
+        block["type"] == "heading" && block["data"]["level"] == 1
+      end)
+      assert length(h1_blocks) > 0
+      assert h1_blocks |> Enum.at(0) |> Map.get("data") |> Map.get("text") == "第一見出し"
+      
+      h2_blocks = Enum.filter(document["blocks"], fn block -> 
+        block["type"] == "heading" && block["data"]["level"] == 2
+      end)
+      assert length(h2_blocks) > 0
+      assert h2_blocks |> Enum.at(0) |> Map.get("data") |> Map.get("text") == "第二見出し"
+      
+      h3_blocks = Enum.filter(document["blocks"], fn block -> 
+        block["type"] == "heading" && block["data"]["level"] == 3
+      end)
+      assert length(h3_blocks) > 0
+      assert h3_blocks |> Enum.at(0) |> Map.get("data") |> Map.get("text") == "第三見出し"
     end
   end
 end
