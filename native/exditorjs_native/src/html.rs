@@ -30,7 +30,7 @@ impl HtmlParser {
 
         while pos < chars.len() && iteration < max_iterations {
             iteration += 1;
-            
+
             // Skip whitespace
             while pos < chars.len() && chars[pos].is_whitespace() {
                 pos += 1;
@@ -43,7 +43,7 @@ impl HtmlParser {
             // Check if we're at a tag
             if chars[pos] == '<' {
                 let old_pos = pos;
-                
+
                 // Find the end of the tag
                 if let Some(tag_end_pos) = chars[pos..].iter().position(|&c| c == '>') {
                     // Parse the tag
@@ -150,7 +150,9 @@ impl HtmlParser {
             if let Some(block) = self.parse_iframe_tag(&tag_content) {
                 let closing_tag = "</iframe>";
                 // Find closing tag
-                if let Some(closing_tag_pos) = self.find_string_in_chars(chars, tag_end + 1, closing_tag) {
+                if let Some(closing_tag_pos) =
+                    self.find_string_in_chars(chars, tag_end + 1, closing_tag)
+                {
                     *pos = closing_tag_pos + closing_tag.len();
                 }
                 return Some(block);
@@ -161,7 +163,8 @@ impl HtmlParser {
         let closing_tag = format!("</{}>", tag_name);
         let content_start = tag_end + 1;
 
-        if let Some(closing_tag_pos) = self.find_string_in_chars(chars, content_start, &closing_tag) {
+        if let Some(closing_tag_pos) = self.find_string_in_chars(chars, content_start, &closing_tag)
+        {
             let content: String = chars[content_start..closing_tag_pos].iter().collect();
             *pos = closing_tag_pos + closing_tag.len();
 
@@ -175,12 +178,8 @@ impl HtmlParser {
 
     fn find_string_in_chars(&self, chars: &[char], start: usize, pattern: &str) -> Option<usize> {
         let pattern_chars: Vec<char> = pattern.chars().collect();
-        for i in start..=chars.len().saturating_sub(pattern_chars.len()) {
-            if &chars[i..i + pattern_chars.len()] == pattern_chars.as_slice() {
-                return Some(i);
-            }
-        }
-        None
+        (start..=chars.len().saturating_sub(pattern_chars.len()))
+            .find(|&i| &chars[i..i + pattern_chars.len()] == pattern_chars.as_slice())
     }
 
     fn parse_tag(&self, tag: &str, attrs: &str, content: &str) -> Result<Option<EditorJsBlock>> {
@@ -274,40 +273,40 @@ impl HtmlParser {
         let mut items = Vec::new();
         let mut pos = 0;
         let content_bytes = content.as_bytes();
-        
+
         while pos < content.len() {
             // Skip whitespace
             while pos < content.len() && content_bytes[pos].is_ascii_whitespace() {
                 pos += 1;
             }
-            
+
             if pos >= content.len() {
                 break;
             }
-            
+
             // Look for <li tag
             if !content[pos..].starts_with("<li") {
                 pos += 1;
                 continue;
             }
-            
+
             // Find the end of the opening li tag
             let li_tag_end = match content[pos..].find('>') {
                 Some(idx) => pos + idx + 1,
                 None => break,
             };
-            
+
             // Find the closing </li> tag, accounting for nested tags
             let li_content_start = li_tag_end;
             let mut depth = 0;
             let mut li_content_end = li_content_start;
             let mut search_pos = li_content_start;
-            
+
             loop {
                 if search_pos >= content.len() {
                     break;
                 }
-                
+
                 // Look for opening tags
                 if let Some(open_pos) = content[search_pos..].find('<') {
                     let check_pos = search_pos + open_pos;
@@ -320,13 +319,15 @@ impl HtmlParser {
                             depth -= 1;
                             search_pos = check_pos + 5;
                         }
-                    } else if content[check_pos..].starts_with("<li") {
+                    } else if content[check_pos..].starts_with("<li")
+                        || content[check_pos..].starts_with("<ul")
+                        || content[check_pos..].starts_with("<ol")
+                    {
                         depth += 1;
                         search_pos = check_pos + 3;
-                    } else if content[check_pos..].starts_with("<ul") || content[check_pos..].starts_with("<ol") {
-                        depth += 1;
-                        search_pos = check_pos + 3;
-                    } else if content[check_pos..].starts_with("</ul>") || content[check_pos..].starts_with("</ol>") {
+                    } else if content[check_pos..].starts_with("</ul>")
+                        || content[check_pos..].starts_with("</ol>")
+                    {
                         depth -= 1;
                         search_pos = check_pos + 5;
                     } else {
@@ -341,13 +342,13 @@ impl HtmlParser {
                     break;
                 }
             }
-            
+
             let li_content = &content[li_content_start..li_content_end];
-            
+
             // Check for nested lists
             let mut item_text = li_content.to_string();
             let mut nested_items = Vec::new();
-            
+
             // Extract nested unordered list
             if let Some(ul_start) = item_text.find("<ul") {
                 if let Some(ul_tag_end) = item_text[ul_start..].find('>') {
@@ -355,7 +356,11 @@ impl HtmlParser {
                     if let Some(ul_end) = item_text[search_from..].find("</ul>") {
                         let nested_content = &item_text[search_from..search_from + ul_end];
                         nested_items = self.parse_list_items(nested_content, "unordered");
-                        item_text = format!("{}{}", &item_text[..ul_start], &item_text[search_from + ul_end + 5..]);
+                        item_text = format!(
+                            "{}{}",
+                            &item_text[..ul_start],
+                            &item_text[search_from + ul_end + 5..]
+                        );
                     }
                 }
             }
@@ -366,13 +371,17 @@ impl HtmlParser {
                     if let Some(ol_end) = item_text[search_from..].find("</ol>") {
                         let nested_content = &item_text[search_from..search_from + ol_end];
                         nested_items = self.parse_list_items(nested_content, "ordered");
-                        item_text = format!("{}{}", &item_text[..ol_start], &item_text[search_from + ol_end + 5..]);
+                        item_text = format!(
+                            "{}{}",
+                            &item_text[..ol_start],
+                            &item_text[search_from + ol_end + 5..]
+                        );
                     }
                 }
             }
-            
+
             let cleaned_text = self.clean_html(item_text.trim());
-            
+
             // Check if this is a checklist item
             let checked = if li_content.contains("type=\"checkbox\"") {
                 if li_content.contains("checked") {
@@ -383,7 +392,7 @@ impl HtmlParser {
             } else {
                 None
             };
-            
+
             items.push(ListItem {
                 content: cleaned_text,
                 meta: ListItemMeta { checked },
@@ -508,7 +517,7 @@ impl HtmlParser {
         let mut result = String::new();
         let mut in_tag = false;
         let mut tag_depth = 0;
-        
+
         for ch in text.chars() {
             match ch {
                 '<' => {
@@ -527,7 +536,7 @@ impl HtmlParser {
                 _ => {}
             }
         }
-        
+
         // Decode HTML entities
         self.decode_entities(&result)
     }
