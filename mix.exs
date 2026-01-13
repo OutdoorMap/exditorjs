@@ -10,7 +10,22 @@ defmodule ExditorJS.MixProject do
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: Mix.compilers()
+      compilers: Mix.compilers(),
+      description: description(),
+      package: package()
+    ]
+  end
+
+  defp description do
+    "Elixir/Rust library for parsing and validating EditorJS content"
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => "https://github.com/OutdoorMap/exditorjs"
+      }
     ]
   end
 
