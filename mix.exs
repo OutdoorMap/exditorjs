@@ -25,7 +25,8 @@ defmodule ExditorJS.MixProject do
       licenses: ["MIT"],
       links: %{
         "GitHub" => "https://github.com/OutdoorMap/exditorjs"
-      }
+      },
+      files: ["lib", "mix.exs", "README*", "LICENSE", "native/exditorjs_native", "checksum-*.exs"]
     ]
   end
 
