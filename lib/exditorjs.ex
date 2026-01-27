@@ -2,7 +2,7 @@ defmodule ExditorJS do
   @moduledoc """
   Native Elixir module for converting Markdown and HTML to EditorJS format
   using Rustler for performance.
-  
+
   This module provides functions to convert HTML and Markdown content into
   EditorJS block format, which can be used with the Editor.js library.
   """
@@ -18,15 +18,14 @@ defmodule ExditorJS do
       Enum.uniq(["aarch64-unknown-linux-musl" | RustlerPrecompiled.Config.default_targets()]),
     version: version
 
-
   @doc """
   Converts HTML to EditorJS blocks format.
-  
+
   Takes a string containing HTML and returns a list of EditorJS blocks
   that can be used with Editor.js.
-  
+
   ## Examples
-  
+
       iex> ExditorJS.html_to_editorjs("<h1>Hello</h1><p>World</p>")
       {:ok, [%{"type" => "heading", ...}, %{"type" => "paragraph", ...}]}
       
@@ -35,19 +34,19 @@ defmodule ExditorJS do
   """
   def html_to_editorjs(html) do
     case html_to_editorjs_nif(html) do
-      {:ok, json} -> {:ok, Jason.decode!(json)}
+      {:ok, json} -> ExditorJS.JSON.decode(json, json_library())
       {:error, reason} -> {:error, reason}
     end
   end
 
   @doc """
   Converts Markdown to EditorJS blocks format.
-  
+
   Takes a string containing Markdown and returns a list of EditorJS blocks
   that can be used with Editor.js.
-  
+
   ## Examples
-  
+
       iex> ExditorJS.markdown_to_editorjs("# Heading\\n\\nParagraph text")
       {:ok, [%{"type" => "heading", ...}, %{"type" => "paragraph", ...}]}
       
@@ -56,8 +55,41 @@ defmodule ExditorJS do
   """
   def markdown_to_editorjs(markdown) do
     case markdown_to_editorjs_nif(markdown) do
-      {:ok, json} -> {:ok, Jason.decode!(json)}
+      {:ok, json} -> ExditorJS.JSON.decode(json, json_library())
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp json_library do
+    case Application.get_env(:exditorjs, :json_library) do
+      nil ->
+        if Code.ensure_loaded?(JSON) do
+          JSON
+        else
+          if Code.ensure_loaded?(Jason) do
+            Jason
+          else
+            raise """
+            No JSON library configured and none available.
+
+            Please add a JSON library to your deps and config:
+
+                # Use Jason (recommended)
+                {:jason, "~> 1.4"}
+
+                # Or use Erlang's JSON
+                {:json, "~> 1.4"}
+
+            And configure it in config.exs:
+                config :exditorjs, json_library: Jason
+                # or
+                config :exditorjs, json_library: JSON
+            """
+          end
+        end
+
+      lib ->
+        lib
     end
   end
 

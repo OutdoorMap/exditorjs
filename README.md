@@ -20,6 +20,29 @@ Then, run the following command to fetch the dependency:
 mix deps.get
 ```
 
+## Configuration
+
+By default, the library automatically selects the best available JSON library:
+1. If Erlang's `JSON` module is available, it uses that
+2. Otherwise, it falls back to `Jason`
+
+You can explicitly configure which JSON library to use in your `config.exs`:
+
+```elixir
+# Use Erlang's JSON (if available)
+config :exditorjs, json_library: JSON
+
+# Use Jason
+config :exditorjs, json_library: Jason
+```
+
+Both libraries are optional dependencies. Add the ones you want to use:
+
+```elixir
+{:json, "~> 1.4", optional: true}
+{:jason, "~> 1.4", optional: true}
+```
+
 ## Usage
 
 After installing the library, you can use it to convert Markdown or HTML to Editor.js JSON format.

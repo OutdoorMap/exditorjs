@@ -26,7 +26,17 @@ defmodule ExditorJS.MixProject do
       links: %{
         "GitHub" => "https://github.com/OutdoorMap/exditorjs"
       },
-      files: ["lib", "mix.exs", "README*", "LICENSE", "native/exditorjs_native/src", "native/exditorjs_native/.cargo", "native/exditorjs_native/README*", "native/exditorjs_native/Cargo*", "checksum-*.exs"]
+      files: [
+        "lib",
+        "mix.exs",
+        "README*",
+        "LICENSE",
+        "native/exditorjs_native/src",
+        "native/exditorjs_native/.cargo",
+        "native/exditorjs_native/README*",
+        "native/exditorjs_native/Cargo*",
+        "checksum-*.exs"
+      ]
     ]
   end
 
@@ -35,7 +45,8 @@ defmodule ExditorJS.MixProject do
       {:rustler, "~> 0.37.1", optional: true, runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:rustler_precompiled, "~> 0.8.3"},
-      {:jason, "~> 1.4"}
+      {:json, "~> 1.4", optional: true},
+      {:jason, "~> 1.4", optional: true}
     ]
   end
 end
