@@ -16,7 +16,7 @@ defmodule ExditorJS.MixProject do
 
   defp deps do
     [
-      {:rustler, "~> 0.35.1", optional: true, runtime: false},
+      {:rustler, "~> 0.37.1", optional: true, runtime: false},
       {:rustler_precompiled, "~> 0.8.3"},
       {:jason, "~> 1.4"}
     ]
