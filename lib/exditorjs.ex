@@ -61,7 +61,36 @@ defmodule ExditorJS do
   end
 
   defp json_library do
-    Application.get_env(:exditorjs, :json_library, JSON)
+    case Application.get_env(:exditorjs, :json_library) do
+      nil ->
+        if Code.ensure_loaded?(JSON) do
+          JSON
+        else
+          if Code.ensure_loaded?(Jason) do
+            Jason
+          else
+            raise """
+            No JSON library configured and none available.
+
+            Please add a JSON library to your deps and config:
+
+                # Use Jason (recommended)
+                {:jason, "~> 1.4"}
+
+                # Or use Erlang's JSON
+                {:json, "~> 1.4"}
+
+            And configure it in config.exs:
+                config :exditorjs, json_library: Jason
+                # or
+                config :exditorjs, json_library: JSON
+            """
+          end
+        end
+
+      lib ->
+        lib
+    end
   end
 
   # Private NIF functions

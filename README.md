@@ -22,20 +22,25 @@ mix deps.get
 
 ## Configuration
 
-By default, the library uses Erlang's built-in `JSON` module for encoding/decoding. You can configure it to use a different JSON library in your `config.exs`:
+By default, the library automatically selects the best available JSON library:
+1. If Erlang's `JSON` module is available, it uses that
+2. Otherwise, it falls back to `Jason`
+
+You can explicitly configure which JSON library to use in your `config.exs`:
 
 ```elixir
-# Use Erlang's JSON (default)
+# Use Erlang's JSON (if available)
 config :exditorjs, json_library: JSON
 
-# Use Jason instead
+# Use Jason
 config :exditorjs, json_library: Jason
 ```
 
-If you want to use Jason, make sure to add it to your dependencies:
+Both libraries are optional dependencies. Add the ones you want to use:
 
 ```elixir
-{:jason, "~> 1.4"}
+{:json, "~> 1.4", optional: true}
+{:jason, "~> 1.4", optional: true}
 ```
 
 ## Usage
