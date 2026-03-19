@@ -513,27 +513,85 @@ impl HtmlParser {
     }
 
     fn clean_html(&self, text: &str) -> String {
-        // Remove HTML tags without using regex to avoid catastrophic backtracking
-        let mut result = String::new();
-        let mut in_tag = false;
-        let mut tag_depth = 0;
+        // Strip block-level/unwanted HTML tags but preserve inline formatting tags
+        // that Editor.js expects in text fields (b, i, a, mark, code, etc.)
+        let allowed_tags: &[&str] = &[
+            "b", "strong", "i", "em", "a", "mark", "code", "s", "del", "u", "sub", "sup",
+        ];
 
-        for ch in text.chars() {
-            match ch {
-                '<' => {
-                    in_tag = true;
-                    tag_depth += 1;
-                }
-                '>' => {
-                    in_tag = false;
-                    if tag_depth > 0 {
-                        tag_depth -= 1;
+        let mut result = String::new();
+        let mut pos = 0;
+
+        while pos < text.len() {
+            if text.as_bytes()[pos] == b'<' {
+                // Find the end of this tag
+                if let Some(gt_offset) = text[pos..].find('>') {
+                    let tag_str = &text[pos + 1..pos + gt_offset];
+                    let is_closing = tag_str.starts_with('/');
+                    let tag_inner = if is_closing { &tag_str[1..] } else { tag_str };
+
+                    // Extract just the tag name (before any attributes or spaces)
+                    let tag_name = tag_inner
+                        .split(|c: char| c.is_whitespace() || c == '/')
+                        .next()
+                        .unwrap_or("")
+                        .to_lowercase();
+
+                    if allowed_tags.contains(&tag_name.as_str()) {
+                        // Normalize strong→b and em→i
+                        if is_closing {
+                            let normalized = match tag_name.as_str() {
+                                "strong" => "b",
+                                "em" => "i",
+                                "del" => "s",
+                                _ => &tag_name,
+                            };
+                            result.push_str(&format!("</{}>", normalized));
+                        } else {
+                            let normalized_name = match tag_name.as_str() {
+                                "strong" => "b",
+                                "em" => "i",
+                                "del" => "s",
+                                _ => &tag_name,
+                            };
+                            // Preserve attributes for <a> tags
+                            let attrs_part = tag_inner[tag_name.len()..].trim_start();
+                            let is_self_closing = attrs_part.ends_with('/');
+                            let attrs_part = attrs_part.trim_end_matches('/').trim();
+                            if attrs_part.is_empty() {
+                                if is_self_closing {
+                                    result.push_str(&format!("<{}/>", normalized_name));
+                                } else {
+                                    result.push_str(&format!("<{}>", normalized_name));
+                                }
+                            } else {
+                                if is_self_closing {
+                                    result.push_str(&format!(
+                                        "<{} {}/>",
+                                        normalized_name, attrs_part
+                                    ));
+                                } else {
+                                    result.push_str(&format!(
+                                        "<{} {}>",
+                                        normalized_name, attrs_part
+                                    ));
+                                }
+                            }
+                        }
                     }
+                    // else: unwanted tag, strip it but keep text content
+
+                    pos += gt_offset + 1;
+                } else {
+                    // No closing '>', just output the '<' as text
+                    result.push('<');
+                    pos += 1;
                 }
-                _ if !in_tag => {
-                    result.push(ch);
-                }
-                _ => {}
+            } else {
+                // Advance by one UTF-8 character
+                let ch = text[pos..].chars().next().unwrap();
+                result.push(ch);
+                pos += ch.len_utf8();
             }
         }
 
@@ -618,6 +676,109 @@ mod tests {
             assert_eq!(data.items[1].items[0].content, "Nested 1");
         } else {
             panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_paragraph_preserves_bold() {
+        let html = "<p><b>Felanmälan</b></p>";
+        let blocks = html_to_editorjs(html).unwrap();
+        assert_eq!(blocks.len(), 1);
+        if let EditorJsBlock::Paragraph { data } = &blocks[0] {
+            assert_eq!(data.text, "<b>Felanmälan</b>");
+        } else {
+            panic!("Expected paragraph block");
+        }
+    }
+
+    #[test]
+    fn test_paragraph_normalizes_strong_to_b() {
+        let html = "<p><strong>bold</strong></p>";
+        let blocks = html_to_editorjs(html).unwrap();
+        assert_eq!(blocks.len(), 1);
+        if let EditorJsBlock::Paragraph { data } = &blocks[0] {
+            assert_eq!(data.text, "<b>bold</b>");
+        } else {
+            panic!("Expected paragraph block");
+        }
+    }
+
+    #[test]
+    fn test_paragraph_preserves_link() {
+        let html = r#"<p><a href="https://example.com" target="_blank">link text</a></p>"#;
+        let blocks = html_to_editorjs(html).unwrap();
+        assert_eq!(blocks.len(), 1);
+        if let EditorJsBlock::Paragraph { data } = &blocks[0] {
+            assert_eq!(
+                data.text,
+                r#"<a href="https://example.com" target="_blank">link text</a>"#
+            );
+        } else {
+            panic!("Expected paragraph block");
+        }
+    }
+
+    #[test]
+    fn test_paragraph_preserves_mixed_inline() {
+        let html = "<p>Hello <b>bold</b> and <i>italic</i> and <mark>highlighted</mark></p>";
+        let blocks = html_to_editorjs(html).unwrap();
+        assert_eq!(blocks.len(), 1);
+        if let EditorJsBlock::Paragraph { data } = &blocks[0] {
+            assert_eq!(
+                data.text,
+                "Hello <b>bold</b> and <i>italic</i> and <mark>highlighted</mark>"
+            );
+        } else {
+            panic!("Expected paragraph block");
+        }
+    }
+
+    #[test]
+    fn test_paragraph_strips_nested_div() {
+        let html = "<p><div>inner</div> text</p>";
+        let blocks = html_to_editorjs(html).unwrap();
+        assert_eq!(blocks.len(), 1);
+        if let EditorJsBlock::Paragraph { data } = &blocks[0] {
+            assert_eq!(data.text, "inner text");
+        } else {
+            panic!("Expected paragraph block");
+        }
+    }
+
+    #[test]
+    fn test_heading_preserves_inline() {
+        let html = "<h2>Title with <b>bold</b></h2>";
+        let blocks = html_to_editorjs(html).unwrap();
+        assert_eq!(blocks.len(), 1);
+        if let EditorJsBlock::Heading { data } = &blocks[0] {
+            assert_eq!(data.text, "Title with <b>bold</b>");
+            assert_eq!(data.level, 2);
+        } else {
+            panic!("Expected heading block");
+        }
+    }
+
+    #[test]
+    fn test_list_preserves_inline() {
+        let html = "<ul><li><b>bold item</b></li><li>normal</li></ul>";
+        let blocks = html_to_editorjs(html).unwrap();
+        assert_eq!(blocks.len(), 1);
+        if let EditorJsBlock::List { data } = &blocks[0] {
+            assert_eq!(data.items[0].content, "<b>bold item</b>");
+            assert_eq!(data.items[1].content, "normal");
+        } else {
+            panic!("Expected list block");
+        }
+    }
+
+    #[test]
+    fn test_normalizes_em_to_i_and_del_to_s() {
+        let html = "<p><em>italic</em> and <del>deleted</del></p>";
+        let blocks = html_to_editorjs(html).unwrap();
+        if let EditorJsBlock::Paragraph { data } = &blocks[0] {
+            assert_eq!(data.text, "<i>italic</i> and <s>deleted</s>");
+        } else {
+            panic!("Expected paragraph block");
         }
     }
 

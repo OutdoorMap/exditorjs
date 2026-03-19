@@ -61,6 +61,63 @@ defmodule ExditorJSTest do
       assert quote_block["data"]["text"] == "This is a blockquote with some wisdom."
     end
 
+    test "preserves inline HTML formatting in separate paragraphs" do
+      html = """
+      <p><b>Rapportera problem</b></p>
+      <p><b>Kundtjänst Göteborg</b></p>
+      <p>Rapportera problem med vandringsleder, skidspår och friluftsområden</p>
+      <p><a href="https://goteborg.se/rapportera" rel="nofollow noopener" target="_blank">Rapportera via deras hemsida</a></p>
+      <p><b>Telefon:</b> 031-123 45 67</p>
+      <p><b>E-post:</b> info@goteborg.se</p>
+      """
+
+      {:ok, document} = ExditorJS.html_to_editorjs(html)
+
+      paragraphs =
+        document["blocks"]
+        |> Enum.filter(fn block -> block["type"] == "paragraph" end)
+        |> Enum.map(fn block -> block["data"]["text"] end)
+
+      assert "<b>Rapportera problem</b>" in paragraphs
+      assert "<b>Kundtjänst Göteborg</b>" in paragraphs
+
+      assert "Rapportera problem med vandringsleder, skidspår och friluftsområden" in paragraphs
+
+      assert Enum.any?(paragraphs, fn text ->
+               String.contains?(text, ~s|<a href="https://goteborg.se/rapportera"|) and
+                 String.contains?(text, "Rapportera via deras hemsida</a>")
+             end)
+
+      assert "<b>Telefon:</b> 031-123 45 67" in paragraphs
+      assert "<b>E-post:</b> info@goteborg.se" in paragraphs
+    end
+
+    test "preserves inline HTML formatting within a single paragraph with newlines" do
+      html =
+        "<p>\n<strong>Rapportera problem</strong>\n<strong>Kundtjänst Göteborg</strong>\nRapportera problem med vandringsleder, skidspår och friluftsområden\n<a href=\"https://goteborg.se/rapportera\" rel=\"nofollow noopener\" target=\"_blank\">Rapportera via deras hemsida</a>\n<strong>Telefon:</strong> 031-123 45 67\n<strong>E-post:</strong> info@goteborg.se\n</p>"
+
+      {:ok, document} = ExditorJS.html_to_editorjs(html)
+
+      paragraphs =
+        document["blocks"]
+        |> Enum.filter(fn block -> block["type"] == "paragraph" end)
+
+      assert length(paragraphs) >= 1
+
+      text = Enum.at(paragraphs, 0)["data"]["text"]
+
+      # strong should be normalized to b
+      assert String.contains?(text, "<b>Rapportera problem</b>")
+      assert String.contains?(text, "<b>Kundtjänst Göteborg</b>")
+      assert String.contains?(text, "vandringsleder, skidspår och friluftsområden")
+
+      assert String.contains?(text, ~s|<a href="https://goteborg.se/rapportera"|)
+      assert String.contains?(text, "Rapportera via deras hemsida</a>")
+
+      assert String.contains?(text, "<b>Telefon:</b> 031-123 45 67")
+      assert String.contains?(text, "<b>E-post:</b> info@goteborg.se")
+    end
+
     test "handles empty HTML" do
       {:ok, document} = ExditorJS.html_to_editorjs("")
 
@@ -599,7 +656,7 @@ defmodule ExditorJSTest do
       assert Enum.any?(heading_texts, fn text -> String.contains?(text, "Hyrcyklar") end)
       assert Enum.any?(heading_texts, fn text -> String.contains?(text, "cykel") end)
 
-      # Check that link text is preserved (link should be stripped but text remains)
+      # Check that link is preserved as inline HTML with text
       paragraph_blocks =
         Enum.filter(document["blocks"], fn block -> block["type"] == "paragraph" end)
 
@@ -623,8 +680,9 @@ defmodule ExditorJSTest do
 
       paragraph = Enum.find(document["blocks"], fn block -> block["type"] == "paragraph" end)
       assert paragraph != nil
-      # Link text should be extracted but link itself removed
-      assert String.contains?(paragraph["data"]["text"], "our website")
+      # Link tag and text should be preserved as inline HTML
+      assert String.contains?(paragraph["data"]["text"], "<a href=")
+      assert String.contains?(paragraph["data"]["text"], "our website</a>")
       assert String.contains?(paragraph["data"]["text"], "more info")
     end
 
@@ -741,8 +799,9 @@ defmodule ExditorJSTest do
 
       paragraph = Enum.find(document["blocks"], fn block -> block["type"] == "paragraph" end)
       assert paragraph != nil
-      # Link text should be extracted but link itself removed
-      assert String.contains?(paragraph["data"]["text"], "こちら")
+      # Link tag and text should be preserved as inline HTML
+      assert String.contains?(paragraph["data"]["text"], "<a href=")
+      assert String.contains?(paragraph["data"]["text"], "こちら</a>")
       assert String.contains?(paragraph["data"]["text"], "ご覧ください")
     end
 
