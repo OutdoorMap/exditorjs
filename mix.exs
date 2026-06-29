@@ -42,7 +42,7 @@ defmodule ExditorJS.MixProject do
 
   defp deps do
     [
-      {:rustler, "~> 0.37.1", optional: true, runtime: false},
+      {:rustler, "~> 0.38.0", optional: true, runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:rustler_precompiled, "~> 0.9.0"},
       {:json, "~> 1.4", optional: true},
